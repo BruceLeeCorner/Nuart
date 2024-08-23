@@ -51,9 +51,10 @@ namespace NKit.Uart
         private byte[] _sendingBytes;
         private bool _disposedValue;
 
+
         #endregion Reset These Variables Before Transmition
 
-        private SerialPort _port;
+        private readonly SerialPort _port;
 
         #endregion Fileds
 
@@ -266,12 +267,6 @@ namespace NKit.Uart
                     _waitReplyEvent.Set();
                 }
             }
-        }
-
-        public void Reset()
-        {
-            _port = new SerialPort(PortName, BaudRate, Parity, DataBits);
-            _port.Open();
         }
 
         private void Open()

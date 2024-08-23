@@ -9,7 +9,7 @@
 
 //namespace NKit.Uart
 //{
-//    public class ModbusRtuPoller : SerialBase, IModbusPoller
+//    public class ModbusRtuPoller : Serial, IModbusPoller
 //    {
 //        public ModbusRtuPoller(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits) : base(portName, baudRate, parity, stopBits, dataBits)
 //        {

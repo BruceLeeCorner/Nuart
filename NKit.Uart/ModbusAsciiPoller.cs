@@ -5,7 +5,7 @@ using System.Text;
 
 namespace NKit.Uart
 {
-    //public class ModbusAsciiPoller : SerialBase,IModbusPoller
+    //public class ModbusAsciiPoller : Serial,IModbusPoller
     //{
     //}
 }
