@@ -8,7 +8,13 @@
         Title="MainWindow" Height="450" Width="800" Loaded="MainWindow_OnLoaded">
     <Grid>
 <StackPanel>
-            <Button Content="Dispose" Margin="5" Click="ButtonBase_OnClick"></Button>
-</StackPanel>
+            <Button Content="always send" Margin="5" Click="ButtonBase_OnClick"></Button>
+
+    <Button Content="COM3" x:Name="ButtonCom3" Margin="5" Click="ButtonCom3_OnClick"></Button>
+
+    <Button Content="COM2" x:Name="ButtonCom2" Margin="5" Click="ButtonCom2_OnClick"></Button>
+
+            <Button Content="reset" Margin="5" Click="ButtonBase_OnClick1"></Button>
+        </StackPanel>
     </Grid>
 </Window>

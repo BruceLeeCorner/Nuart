@@ -1,16 +1,259 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Threading;
 
 namespace NKit.Uart
 {
-
-
     public abstract class SerialBase : IDisposable
     {
+        #region Fields
+
+        private readonly List<byte> _dataReceivedBuffer;
+        private readonly AutoResetEvent _replayEvent;
+        private readonly AutoResetEvent _resetPortEvent;
+        private readonly Timer _timer;
+        private readonly object _transmissionLocker;
+        private bool _resetFlag = false;
+        private SerialPort _serialPort;
+
+        #endregion Fields
+
+        protected SerialBase(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
+        {
+        }
+
+        protected SerialBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool enableRts, Handshake handshake)
+        {
+            PortName = portName;
+            BaudRate = baudRate;
+            Parity = parity;
+            StopBits = stopBits;
+            Handshake = handshake;
+            DataBits = dataBits;
+            EnableRts = enableRts;
+            _dataReceivedBuffer = new List<byte>();
+            _replayEvent = new AutoResetEvent(false);
+            _resetPortEvent = new AutoResetEvent(false);
+            _transmissionLocker = new object();
+            _serialPort = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
+            _serialPort.RtsEnable = EnableRts;
+            _serialPort.Handshake = Handshake;
+            _timer = new Timer(CallBack);
+            _timer.Change(0, Timeout.Infinite);
+        }
+
+        public event EventHandler<SerialEventArgs> CompletedPackageReceived;
+
+        /// <summary>
+        /// 用于调试串口，强烈建议注册程序只是打印日志
+        /// </summary>
+        public event EventHandler<SerialEventArgs> DataReadFromInBuffer;
+
+        public event EventHandler<SerialEventArgs> DataSent;
+
+        #region Communication Options
+
+        public int BaudRate { get; set; }
+
+        public int DataBits { get; set; }
+
+        /// <summary>
+        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
+        /// </summary>
+        public bool EnableRts { get; set; }
+
+        /// <summary>
+        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
+        /// </summary>
+        public Handshake Handshake { get; set; }
+
+        public Parity Parity { get; set; }
+
+        public string PortName { get; set; }
+
+        public StopBits StopBits { get; set; }
+
+        #endregion Communication Options
+
+        public void Reset()
+        {
+            lock (_transmissionLocker)
+            {
+                _resetPortEvent.Reset();
+                _resetFlag = true;
+                _resetPortEvent.WaitOne();
+            }
+        }
+
+        protected abstract void FilterCompletedPackages(byte[] copyOfDataReceivedBuffer, Func<bool> hasBytesInReadBuffer, out int[] singlePackageEndingIndexes);
+
+        protected Response<byte[]> Request(byte[] bytes, int replyTimeout = 200)
+        {
+            if (replyTimeout <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(replyTimeout), "The argument should be greater than 0");
+            }
+
+            if (bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+
+            lock (_transmissionLocker)
+            {
+                try
+                {
+                    if (!_serialPort.IsOpen)
+                    {
+                        _serialPort.Open();
+                    }
+                    _replayEvent.Reset();
+                    _serialPort.ReadTimeout = replyTimeout;
+                    var start = Environment.TickCount;
+                    _serialPort.Write(bytes, 0, bytes.Length);
+                    DataSent?.Invoke(this, new SerialEventArgs(bytes));
+                    var end = Environment.TickCount;
+                    var timeout = !_replayEvent.WaitOne(replyTimeout - (end - start));
+                    return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout.") : new Response<byte[]>(_dataReceivedBuffer.ToArray());
+                }
+                catch (Exception exception)
+                {
+                    return new Response<byte[]>(_dataReceivedBuffer.ToArray(), exception);
+                }
+            }
+        }
+
+        protected Response Send(byte[] bytes, int writeTimeout = 200)
+        {
+            lock (_transmissionLocker)
+            {
+                try
+                {
+                    if (!_serialPort.IsOpen)
+                    {
+                        Thread.Sleep(writeTimeout);
+                        if (!_serialPort.IsOpen)
+                        {
+                            throw new InvalidOperationException("Port hasn't opened.");
+                        }
+                    }
+
+                    _serialPort.WriteTimeout = writeTimeout;
+                    _serialPort.Write(bytes, 0, bytes.Length);
+                    DataSent?.Invoke(this, new SerialEventArgs(bytes));
+                    return new Response();
+                }
+                catch (Exception exception)
+                {
+                    return new Response(exception);
+                }
+            }
+        }
+
+        private void CallBack(object state)
+        {
+            try
+            {
+                if (!_serialPort.IsOpen)
+                {
+                    _serialPort.Open();
+                }
+                // 定时从接收缓存中取出数据。
+                do
+                {
+                    var temp = new byte[_serialPort.BytesToRead];
+                    // 注意Read不能死等！不要在其他线程轻易调用DiscardIn/OutBuff,会造成Read死等。
+                    // Read阻塞型API. 直到缓冲区至少有1个字节可读便返回，如果长时间缓冲区为0，则一直阻塞，直到超时抛出TimeoutException,如果Timeout值是-1，则一直阻塞。
+                    // temp.Length - offset 如果是0，表示不读取，任何情况下Read都会立刻返回，不存在阻塞情况。
+                    int count = _serialPort.Read(temp, 0, temp.Length);
+                    if (count > 0)
+                    {
+                        var data = temp.Take(count).ToArray();
+                        _dataReceivedBuffer.AddRange(data);
+                        DataReadFromInBuffer?.Invoke(this, new SerialEventArgs(data));
+                    }
+
+                    FilterCompletedPackages(_dataReceivedBuffer.ToArray(), () => _serialPort.BytesToRead > 0,
+                        out int[] indexes);
+
+                    if (indexes != null && indexes.Length > 0)
+                    {
+                        Array.Sort(indexes);
+                        for (int i = 0; i < indexes.Length; i++)
+                        {
+                            var frame = _dataReceivedBuffer.Take(indexes[i] + 1).ToArray();
+                            _dataReceivedBuffer.RemoveRange(0, indexes[i] + 1);
+                            _replayEvent.Set();// 这个位置还需要考虑合不合适
+                            CompletedPackageReceived?.Invoke(this, new SerialEventArgs(frame));
+                        }
+                    }
+
+                    if (_resetFlag)
+                    {
+                        break;
+                    }
+
+                    // ReSharper disable once AccessToDisposedClosure
+                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, 5));
+
+                if (_resetFlag)
+                {
+                    _dataReceivedBuffer.Clear();
+                    _serialPort?.Dispose();
+                    _serialPort = null;
+                    _serialPort = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
+                    _serialPort.RtsEnable = EnableRts;
+                    _serialPort.Handshake = Handshake;
+                    _serialPort.Open();
+                    _resetFlag = false;
+                    _resetPortEvent.Set();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                _resetPortEvent.Set();
+            }
+            finally
+            {
+                _timer.Change(TimeSpan.FromMilliseconds(25), Timeout.InfiniteTimeSpan);
+            }
+        }
+
+        #region Disposable
+
+        ~SerialBase()
+        {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void ReleaseUnmanagedResources()
+        {
+            // TODO release unmanaged resources here
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            ReleaseUnmanagedResources();
+            if (disposing)
+            {
+                _replayEvent?.Dispose();
+                _resetPortEvent?.Dispose();
+                _timer?.Dispose();
+                _serialPort?.Dispose();
+            }
+        }
+
+        #endregion Disposable
+
         public class SerialEventArgs : EventArgs
         {
             public SerialEventArgs(byte[] data)
@@ -19,350 +262,6 @@ namespace NKit.Uart
             }
 
             public byte[] Data { get; }
-        }
-
-
-        private readonly object _locker = new object();
-
-        #region Fileds
-
-        private static readonly byte[] EmptyByteArray = new byte[0];
-
-        // ReSharper disable once IdentifierTypo
-        private readonly object _transmitlocker = new object();
-
-        private readonly object _openPortLocker = new object();
-
-        private bool _willNotify;
-
-        #region Reset These Variables Before Transmition
-
-        private  AutoResetEvent _waitReplyEvent;
-        private readonly Stopwatch _stopWatch;
-
-        /// <summary>
-        /// 响应超时时长
-        /// </summary>
-        private int _replyTimeout = 200;
-
-        /// <summary>
-        /// 最后一次发送请求消息的时刻
-        /// </summary>
-        private DateTime? _latestWaitReplyEndingTime;
-
-        private DateTime? _latestReceiveExpectedReplyTime;
-        private string _errorContent;
-        private byte[] _receivedData;
-        private byte[] _sendingBytes;
-        private bool _disposedValue;
-
-
-        #endregion Reset These Variables Before Transmition
-
-        private SerialPort _port;
-
-        #endregion Fileds
-
-        #region Properties
-
-        /// <summary>
-        /// 串口名称，如COM1,COM2,COM3...
-        /// </summary>
-        public string PortName { get; }
-
-        /// <summary>
-        /// 波特率
-        /// </summary>
-        public int BaudRate { get; }
-
-        /// <summary>
-        /// 校验位
-        /// </summary>
-        public Parity Parity { get; }
-
-        /// <summary>
-        /// 停止位
-        /// </summary>
-        public StopBits StopBits { get; }
-
-        /// <summary>
-        /// 数据位
-        /// </summary>
-        public int DataBits { get; }
-
-        /// <summary>
-        /// 发送和接收一个串口帧(也就是一个有效字节)的耗时
-        /// </summary>
-        public int OneByteTransmissionTime => (int)Math.Ceiling(10000d / BaudRate);
-
-        /// <summary>
-        /// 收到响应或响应超时后，间隔多久再发送下次请求。
-        /// 小于或等于0，表示不延时，即可发送下次请求。
-        /// </summary>
-        public int NextRequestInterval { get; set; }
-
-        #endregion Properties
-
-        private EventHandler<SerialEventArgs> _dataSent;
-        public event EventHandler<SerialEventArgs> DataSent
-        {
-            add => _dataSent += value;
-            remove => _dataSent -= value;
-        }
-
-        private EventHandler<SerialEventArgs> _dataReceived;
-        public event EventHandler<SerialEventArgs> DataReceived
-        {
-            add => _dataReceived += value;
-            remove => _dataReceived -= value;
-        }
-
-        // 单链接，长链接
-        protected SerialBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits)
-        {
-            PortName = portName;
-            BaudRate = baudRate;
-            Parity = parity;
-            StopBits = stopBits;
-            DataBits = dataBits;
-            _port = new SerialPort();
-            _port.PortName = portName;
-            _port.BaudRate = baudRate;
-            _port.DataBits = dataBits;
-            _port.Parity = parity;
-            _port.StopBits = stopBits;
-            _port.Handshake = Handshake.None;
-            _port.RtsEnable = false;
-            _port.DtrEnable = false;
-            _port.DataReceived += _port_DataReceived;
-            _errorContent = string.Empty;
-            _receivedData = EmptyByteArray;
-            _sendingBytes = EmptyByteArray;
-            _latestWaitReplyEndingTime = null;
-            _stopWatch = new Stopwatch();
-            _waitReplyEvent = new AutoResetEvent(false);
-        }
-
-        /// <summary>
-        /// 判断接收缓存内的所有字节是不是一个完整且合法的响应。
-        /// </summary>
-        /// <param name="bytesHasRead">当前已从接收到的字节</param>
-        /// <param name="requestBytes">请求协议包</param>
-        /// <param name="bytesLengthToRead">接收缓存待读的字节</param>
-        /// <param name="checkTimes">当前是第几次检查。返回false，会立刻再次判断接收缓存有无新接收到的字节，有则读取出来再次判断，无则立刻判断。建议加延时。</param>
-        /// <returns></returns>
-        protected abstract bool IsExpectedReply(byte[] requestBytes, byte[] bytesHasRead, int bytesLengthToRead, int checkTimes);
-
-        private bool _needReset;
-
-        public void Abort()
-        {
-            this._dataReceived = null;
-            this._dataSent = null;
-            _port.DataReceived -= _port_DataReceived;
-            _port?.Dispose();
-            _port = null;
-            _waitReplyEvent?.Dispose();
-            _waitReplyEvent = null;
-            //_port = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
-            //_waitReplyEvent = new AutoResetEvent(false);
-
-        }
-
-        protected Response<byte[]> Request(byte[] bytes, int replyTimeout = 200)
-        {
-            if (_needReset)
-            {
-                _port?.Dispose();
-                _waitReplyEvent?.Dispose();
-                _needReset = false;
-
-                _port = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
-                _waitReplyEvent = new AutoResetEvent(false);
-            }
-
-
-            try
-            {
-                // 打开串口
-                Open();
-
-                lock (_transmitlocker)
-                {
-                    // 检查发送请求的时间间隔
-                    if (_latestWaitReplyEndingTime != null)
-                    {
-                        if (NextRequestInterval > 0)
-                        {
-                            double interval = (DateTime.Now - _latestWaitReplyEndingTime.Value).TotalMilliseconds;
-                            if (interval < NextRequestInterval)
-                            {
-                                Thread.Sleep((int)Math.Ceiling(NextRequestInterval - interval));
-                            }
-                        }
-                    }
-
-                    // 重置
-                    _sendingBytes = bytes.ToArray();
-                    _replyTimeout = replyTimeout;
-                    _waitReplyEvent.Reset();
-                    _errorContent = string.Empty;
-                    _receivedData = EmptyByteArray;
-                    _willNotify = false;
-                    _port.DiscardOutBuffer();
-                    _port.DiscardInBuffer();
-                    _port.Write(bytes, 0, bytes.Length);
-                    // 无需等待
-                    if (replyTimeout <= 0)
-                    {
-                        DataReceived?.Invoke(this, new SerialEventArgs(_receivedData));
-                        return new Response<byte[]>(_receivedData, string.Empty);
-                    }
-                    _stopWatch.Restart();
-                    DataSent?.Invoke(this, new SerialEventArgs(bytes));
-                    bool timeout = !_waitReplyEvent.WaitOne(_replyTimeout);
-                    if (timeout && _willNotify)
-                    {
-                        timeout = !_waitReplyEvent.WaitOne(_replyTimeout);
-                    }
-                    _latestWaitReplyEndingTime = DateTime.Now;
-
-                    byte[] returnReceivedData;
-                    string returnErrorContent;
-                    if (timeout == false)
-                    {
-                        returnErrorContent = _errorContent;
-                        returnReceivedData = _receivedData.ToArray();
-                    }
-                    else
-                    {
-                        returnErrorContent = "Response timeout.";
-                        returnReceivedData = _receivedData.ToArray();
-                    }
-                    DataReceived?.Invoke(this, new SerialEventArgs(returnReceivedData));
-                    return new Response<byte[]>(returnReceivedData, returnErrorContent);
-                }
-            }
-            catch (Exception ex)
-            {
-                var returnReceivedData = _receivedData.ToArray();
-                DataReceived?.Invoke(this, new SerialEventArgs(returnReceivedData));
-                return new Response<byte[]>(returnReceivedData, ex);
-            }
-        }
-
-
-        protected abstract bool IsOnLine();
-
-        // ReSharper disable once MethodOverloadWithOptionalParameter
-        public bool IsOnLine(int expiredTimeout = 1000) =>
-            expiredTimeout > 0 && _latestReceiveExpectedReplyTime.HasValue &&
-            ((DateTime.Now - _latestReceiveExpectedReplyTime.Value).TotalMilliseconds < expiredTimeout) || IsOnLine();
-
-        // 必须保证方法在有限的时间内能结束，也就是必须要有超时机制，否则Close不掉串口。
-        private void _port_DataReceived(object sender, SerialDataReceivedEventArgs e)
-        {
-            var port = (SerialPort)sender;
-
-            // 这个判断很有必要， 因为可能多个线程池线程在并行调用DataReceived事件， 但是只有1个线程拿到锁，其他的线程在排队。
-            // 拿到锁的线程把Buffer中的数据读取完毕结束后，唤醒1个等待线程，等待线程第1步先判断有无可读数据，无直接返回， 这样效率比较高。
-            if (port.BytesToRead > 0)
-            {
-
-
-                Thread.CurrentThread.Abort();
-
-
-                try
-                {
-                    _willNotify = true;
-                    var buff = new List<byte>();
-                    int i = 0;
-                    do
-                    {
-                        port.ReadTimeout = _replyTimeout;
-                        var temp = new byte[port.BytesToRead];
-                        // 注意Read不能死等！不要在其他线程轻易调用DiscardIn/OutBuff,会造成Read死等。
-                        int count = port.Read(temp, 0, temp.Length);
-                        // Read阻塞型API. 直到缓冲区至少有1个字节可读便返回，如果长时间缓冲区为0，则一直阻塞，直到超时抛出TimeoutException,如果Timeout值是-1，则一直阻塞。
-                        // temp.Length - offset 如果是0，表示不读取，任何情况下Read都会立刻返回，不存在阻塞情况。
-                        if (count > 0)
-                        {
-                            buff.AddRange(temp.Take(count));
-                            _receivedData = buff.ToArray();
-                        }
-
-                        if (IsExpectedReply(_sendingBytes.ToArray(), buff.ToArray(), port.BytesToRead, ++i))
-                        {
-                            _latestReceiveExpectedReplyTime = DateTime.Now;
-                            break;
-                        }
-
-                        if (_replyTimeout > 0 && _stopWatch.ElapsedMilliseconds > _replyTimeout)
-                        {
-                            _errorContent = $"Response timeout.";
-                            break;
-                        }
-                    } while (true);
-                }
-                catch (Exception exception)
-                {
-                    _errorContent = exception.ToString();
-                }
-                finally
-                {
-                    _stopWatch.Stop();
-                    _waitReplyEvent.Set();
-                }
-            }
-        }
-
-        private void Open()
-        {
-            // ReSharper disable once InconsistentlySynchronizedField
-            // ReSharper disable once InvertIf
-            if (!_port.IsOpen)
-            {
-                lock (_openPortLocker)
-                {
-                    if (!_port.IsOpen)
-                    {
-                        _port.Open();
-                    }
-                }
-            }
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposedValue)
-            {
-                if (disposing)
-                {
-                    // TODO: 释放托管状态(托管对象)
-                }
-
-                // TODO: 释放未托管的资源(未托管的对象)并重写终结器
-                _port.DataReceived -= _port_DataReceived;
-                _waitReplyEvent.Dispose();
-                _port.Dispose();
-                // TODO: 将大型字段设置为 null
-                _disposedValue = true;
-            }
-        }
-
-        // // TODO: 仅当“Dispose(bool disposing)”拥有用于释放未托管资源的代码时才替代终结器
-        ~SerialBase()
-        {
-            // 不要更改此代码。请将清理代码放入“Dispose(bool disposing)”方法中
-            Dispose(disposing: false);
-        }
-
-        public void Dispose()
-        {
-            // 不要更改此代码。请将清理代码放入“Dispose(bool disposing)”方法中
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
         }
     }
 }
