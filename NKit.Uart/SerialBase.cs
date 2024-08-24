@@ -154,6 +154,7 @@ namespace NKit.Uart
         protected abstract bool IsExpectedReply(byte[] requestBytes, byte[] bytesHasRead, int bytesLengthToRead, int checkTimes);
 
         private bool _needReset;
+
         public void Abort()
         {
             this._dataReceived = null;
@@ -165,6 +166,7 @@ namespace NKit.Uart
             _waitReplyEvent = null;
             //_port = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
             //_waitReplyEvent = new AutoResetEvent(false);
+
         }
 
         protected Response<byte[]> Request(byte[] bytes, int replyTimeout = 200)
