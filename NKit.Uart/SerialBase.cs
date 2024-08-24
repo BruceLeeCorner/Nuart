@@ -7,6 +7,8 @@ using System.Threading;
 
 namespace NKit.Uart
 {
+
+
     public abstract class SerialBase : IDisposable
     {
         public class SerialEventArgs : EventArgs
@@ -32,7 +34,7 @@ namespace NKit.Uart
 
         #region Reset These Variables Before Transmition
 
-        private readonly AutoResetEvent _waitReplyEvent;
+        private  AutoResetEvent _waitReplyEvent;
         private readonly Stopwatch _stopWatch;
 
         /// <summary>
@@ -54,7 +56,7 @@ namespace NKit.Uart
 
         #endregion Reset These Variables Before Transmition
 
-        private readonly SerialPort _port;
+        private SerialPort _port;
 
         #endregion Fileds
 
@@ -138,8 +140,25 @@ namespace NKit.Uart
         /// <returns></returns>
         protected abstract bool IsExpectedReply(byte[] requestBytes, byte[] bytesHasRead, int bytesLengthToRead, int checkTimes);
 
+        private bool _needReset;
+        public void Reset()
+        {
+            _needReset = true;
+        }
+
         protected Response<byte[]> Request(byte[] bytes, int replyTimeout = 200)
         {
+            if (_needReset)
+            {
+                _port?.Dispose();
+                _waitReplyEvent?.Dispose();
+                _needReset = false;
+
+                _port = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
+                _waitReplyEvent = new AutoResetEvent(false);
+            }
+
+
             try
             {
                 // 打开串口
@@ -208,6 +227,7 @@ namespace NKit.Uart
                 return new Response<byte[]>(returnReceivedData, ex);
             }
         }
+
 
         protected abstract bool IsOnLine();
 
