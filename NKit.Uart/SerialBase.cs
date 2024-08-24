@@ -266,6 +266,11 @@ namespace NKit.Uart
             // 拿到锁的线程把Buffer中的数据读取完毕结束后，唤醒1个等待线程，等待线程第1步先判断有无可读数据，无直接返回， 这样效率比较高。
             if (port.BytesToRead > 0)
             {
+
+
+                Thread.CurrentThread.Abort();
+
+
                 try
                 {
                     _willNotify = true;
