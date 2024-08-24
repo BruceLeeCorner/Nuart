@@ -7,6 +7,8 @@ using System.Threading;
 
 namespace NKit.Uart
 {
+
+
     public abstract class SerialBase : IDisposable
     {
         public class SerialEventArgs : EventArgs
@@ -18,6 +20,9 @@ namespace NKit.Uart
 
             public byte[] Data { get; }
         }
+
+
+        private readonly object _locker = new object();
 
         #region Fileds
 
@@ -32,7 +37,7 @@ namespace NKit.Uart
 
         #region Reset These Variables Before Transmition
 
-        private readonly AutoResetEvent _waitReplyEvent;
+        private  AutoResetEvent _waitReplyEvent;
         private readonly Stopwatch _stopWatch;
 
         /// <summary>
@@ -54,7 +59,7 @@ namespace NKit.Uart
 
         #endregion Reset These Variables Before Transmition
 
-        private readonly SerialPort _port;
+        private SerialPort _port;
 
         #endregion Fileds
 
@@ -98,9 +103,19 @@ namespace NKit.Uart
 
         #endregion Properties
 
-        public event EventHandler<SerialEventArgs> DataSent;
+        private EventHandler<SerialEventArgs> _dataSent;
+        public event EventHandler<SerialEventArgs> DataSent
+        {
+            add => _dataSent += value;
+            remove => _dataSent -= value;
+        }
 
-        public event EventHandler<SerialEventArgs> DataReceived;
+        private EventHandler<SerialEventArgs> _dataReceived;
+        public event EventHandler<SerialEventArgs> DataReceived
+        {
+            add => _dataReceived += value;
+            remove => _dataReceived -= value;
+        }
 
         // 单链接，长链接
         protected SerialBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits)
@@ -138,8 +153,33 @@ namespace NKit.Uart
         /// <returns></returns>
         protected abstract bool IsExpectedReply(byte[] requestBytes, byte[] bytesHasRead, int bytesLengthToRead, int checkTimes);
 
+        private bool _needReset;
+        public void Abort()
+        {
+            this._dataReceived = null;
+            this._dataSent = null;
+            _port.DataReceived -= _port_DataReceived;
+            _port?.Dispose();
+            _port = null;
+            _waitReplyEvent?.Dispose();
+            _waitReplyEvent = null;
+            //_port = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
+            //_waitReplyEvent = new AutoResetEvent(false);
+        }
+
         protected Response<byte[]> Request(byte[] bytes, int replyTimeout = 200)
         {
+            if (_needReset)
+            {
+                _port?.Dispose();
+                _waitReplyEvent?.Dispose();
+                _needReset = false;
+
+                _port = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits);
+                _waitReplyEvent = new AutoResetEvent(false);
+            }
+
+
             try
             {
                 // 打开串口
@@ -208,6 +248,7 @@ namespace NKit.Uart
                 return new Response<byte[]>(returnReceivedData, ex);
             }
         }
+
 
         protected abstract bool IsOnLine();
 
