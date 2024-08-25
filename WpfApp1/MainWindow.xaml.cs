@@ -22,7 +22,7 @@ namespace WpfApp1
 
         }
 
-        public Device(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool enableRts, Handshake handshake) : base(portName, baudRate, parity, stopBits, dataBits, enableRts, handshake)
+        public Device(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake) : base(portName, baudRate, parity, stopBits, dataBits, rtsEnable, handshake)
         {
 
         }
@@ -56,16 +56,22 @@ namespace WpfApp1
             InitializeComponent();
         }
 
+
+        private int i = 0;
         private void ButtonBase_OnClick(object sender, RoutedEventArgs e)
         {
-            Task.Run(() =>
+            if (i == 0)
             {
-                while (true)
+                i++;
+                Task.Run(() =>
                 {
-                    Thread.Sleep(1000);
-                    device.Send(new byte[] { 41, 42, 42 });
-                }
-            });
+                    while (true)
+                    {
+                        Thread.Sleep(100);
+                        device.Send(new byte[] { 64, 67, 55 });
+                    }
+                });
+            }
         }
 
         private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
@@ -73,7 +79,7 @@ namespace WpfApp1
             device.CompletedPackageReceived += Device_CompletedPackageReceived;
         }
 
-        private void Device_CompletedPackageReceived(object? sender, SerialBase.SerialEventArgs e)
+        private void Device_CompletedPackageReceived( SerialBase.SerialEventArgs<byte[]> e)
         {
             Console.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff") + "   " + Encoding.ASCII.GetString(e.Data));
         }
@@ -85,12 +91,12 @@ namespace WpfApp1
 
         private void ButtonCom3_OnClick(object sender, RoutedEventArgs e)
         {
-            device.PortName = "COM3";
+            device.Reset("COM3");
         }
 
         private void ButtonCom2_OnClick(object sender, RoutedEventArgs e)
         {
-            device.PortName = "COM2";
+            device.Reset("COM2");
         }
     }
 }
