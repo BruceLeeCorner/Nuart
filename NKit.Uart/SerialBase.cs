@@ -15,24 +15,18 @@ namespace NKit.Uart
         private readonly Timer _timer;
         private readonly object _transmissionLocker;
         private readonly AutoResetEvent _waitResponseEvent;
+        private int _resetBaudRate;
+        private int _resetDataBits;
         private bool _resetFlag;
+        private Handshake _resetHandshake;
+        private Parity _resetParity;
+        private string _resetPortName;
+        private bool _resetRtsEnable;
+        private StopBits _resetStopBits;
         private SerialPort _serialPort;
-        protected int OneByteTransmissionTime => (int)Math.Ceiling(10000d / BaudRate);
-        protected object Tag { get; set; }
-        protected int TimerPeriod { get; }
 
         #endregion Fields
 
-        private int _resetBaudRate;
-        private int _resetDataBits;
-
-        private Handshake _resetHandshake;
-        private Parity _resetParity;
-
-        private string _resetPortName;
-
-        private bool _resetRtsEnable;
-        private StopBits _resetStopBits;
         protected SerialBase(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
         {
         }
@@ -58,6 +52,13 @@ namespace NKit.Uart
             _timer.Change(0, Timeout.Infinite);
         }
 
+        protected int OneByteTransmissionTime => (int)Math.Ceiling(10000d / BaudRate);
+        protected object Tag { get; set; }
+        protected int TimerPeriod { get; }
+        protected int TimeCompletedPackageResolvedLatest { get; private set; }
+
+        #region Events
+
         public event Action<SerialEventArgs<byte[]>> CompletedPackageReceived;
 
         /// <summary>
@@ -68,6 +69,8 @@ namespace NKit.Uart
         public event Action<SerialEventArgs<byte[]>> DataSent;
 
         public event Action<SerialEventArgs<Exception>> TimedDataReadingJobThrowException;
+
+        #endregion Events
 
         #region Communication Options
 
@@ -93,7 +96,7 @@ namespace NKit.Uart
 
         #endregion Communication Options
 
-        public void Reset(string portName=null, int? baudRate = null, Parity? parity = null, StopBits? stopBits=null, int? dataBits = null, bool? rtsEnable = null, Handshake? handshake = null)
+        public void Reset(string portName = null, int? baudRate = null, Parity? parity = null, StopBits? stopBits = null, int? dataBits = null, bool? rtsEnable = null, Handshake? handshake = null)
         {
             lock (_transmissionLocker)
             {
@@ -136,7 +139,6 @@ namespace NKit.Uart
                 _resetPortEvent.WaitOne();
             }
         }
-
 
         protected abstract void FilterCompletedPackages(byte[] copyOfDataReceivedBuffer, Func<bool> hasBytesInReadBuffer, out int[] singlePackageEndingIndexes);
 
@@ -245,11 +247,13 @@ namespace NKit.Uart
                         _dataReceivedBuffer.AddRange(data);
                         DataRead?.Invoke(new SerialEventArgs<byte[]>(data, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
                     }
+
                     // ③ 从应用层接收缓存解析出所有完整帧。如果有完整帧，会执行帧处理事件
                     FilterCompletedPackages(_dataReceivedBuffer.ToArray(), () => _serialPort.BytesToRead > 0,
                         out var indexes);
                     if (indexes != null && indexes.Length > 0)
                     {
+                        TimeCompletedPackageResolvedLatest = Environment.TickCount;
                         Array.Sort(indexes);
                         for (var i = 0; i < indexes.Length; i++)
                         {
@@ -292,6 +296,7 @@ namespace NKit.Uart
                 _timer.Change(TimeSpan.FromMilliseconds(TimerPeriod), Timeout.InfiniteTimeSpan);
             }
         }
+
 
         public class SerialEventArgs<T> : EventArgs
         {
