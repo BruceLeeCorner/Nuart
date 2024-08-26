@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace NKit.Uart
 {
@@ -50,19 +49,19 @@ namespace NKit.Uart
                         ? BitConverter.ToUInt32(new byte[4] { bytes[i + 3], bytes[i + 2], bytes[i + 1], bytes[i] }, 0)
                         : BitConverter.ToUInt32(new byte[4] { bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3] }, 0);
                 }
-                else if(byteOrder == ByteOrder4.DCBA)
+                else if (byteOrder == ByteOrder4.DCBA)
                 {
                     uints[i / 4] = isLittleEndian
                         ? BitConverter.ToUInt32(new byte[4] { bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3] }, 0)
                         : BitConverter.ToUInt32(new byte[4] { bytes[i + 3], bytes[i + 2], bytes[i + 1], bytes[i] }, 0);
                 }
-                else if(byteOrder == ByteOrder4.BADC)
+                else if (byteOrder == ByteOrder4.BADC)
                 {
                     uints[i / 4] = isLittleEndian
                         ? BitConverter.ToUInt32(new byte[4] { bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3] }, 0)
                         : BitConverter.ToUInt32(new byte[4] { bytes[i + 3], bytes[i + 2], bytes[i + 1], bytes[i] }, 0);
                 }
-                else if(byteOrder == ByteOrder4.CDAB)
+                else if (byteOrder == ByteOrder4.CDAB)
                 {
                     uints[i / 4] = isLittleEndian
                         ? BitConverter.ToUInt32(new byte[4] { bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3] }, 0)
@@ -91,23 +90,20 @@ namespace NKit.Uart
 
             if (startIndex < 0)
             {
-
             }
 
             if (length < 0)
             {
-
             }
 
             if (startIndex + length > 0)
             {
-
             }
 
             bool isLittleEndian = BitConverter.IsLittleEndian;
             uint[] uints = new uint[bytes.Count / 4];
 
-            for (int i = 0; i < length; i+=4)
+            for (int i = 0; i < length; i += 4)
             {
                 startIndex += i;
                 if (byteOrder == ByteOrder4.ABCD)
@@ -154,8 +150,7 @@ namespace NKit.Uart
         public static float[] ToHostFloat(IList<byte> bytes, int startIndex, int length, ByteOrder4 byteOrder) =>
             ToHostUInt32(bytes, startIndex, length, byteOrder).Select(item => (float)item).ToArray();
 
-        public static float[] ToHostFloat(IList<byte> bytes, ByteOrder4 byteOrder) => 
+        public static float[] ToHostFloat(IList<byte> bytes, ByteOrder4 byteOrder) =>
             ToHostFloat(bytes, 0, bytes.Count, byteOrder);
-
     }
 }

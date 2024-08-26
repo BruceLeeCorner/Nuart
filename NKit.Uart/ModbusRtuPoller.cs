@@ -127,12 +127,10 @@
 //            CheckByteOrder(byteOrder, ByteOrder.AB, ByteOrder.BA);
 //            if (quantity % 2 != 0)
 //            {
-
 //            }
 //            var response = FuncCode03Byte(slaveAddress, startHoldingAddress, quantity, responseTimeout);
 //            if (response.IsSuccess)
 //            {
-
 //                ushort[] shorts = new ushort[response.Data.Length / 2];
 
 //                for (int i = 0; i < response.Data.Length; i++)

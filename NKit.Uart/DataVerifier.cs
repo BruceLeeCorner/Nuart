@@ -101,6 +101,7 @@ namespace NKit.Uart
         #endregion LRC Modbus
 
         #region CRC16 Modbus
+
         // 查表法
         public static (byte high, byte low) Crc16Modbus(IEnumerable<byte> bytes)
         {
@@ -116,6 +117,7 @@ namespace NKit.Uart
             var crcArray = BitConverter.GetBytes(crc);
             return BitConverter.IsLittleEndian ? (crcArray[1], crcArray[0]) : (crcArray[0], crcArray[1]);
         }
+
         // 查表法
         public static (byte high, byte low) Crc16Modbus(IList<byte> bytes, int start, int length)
         {
@@ -134,6 +136,7 @@ namespace NKit.Uart
         #endregion CRC16 Modbus
 
         #region XOR
+
         public static byte Xor(IEnumerable<byte> bytes)
         {
             byte ret = 0;
@@ -152,7 +155,8 @@ namespace NKit.Uart
                 ret ^= bytes[i];
             }
             return ret;
-        } 
-        #endregion
+        }
+
+        #endregion XOR
     }
 }

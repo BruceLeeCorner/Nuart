@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-// ReSharper disable All
+﻿// ReSharper disable All
 
 namespace NKit.Uart
 {
@@ -16,7 +12,7 @@ namespace NKit.Uart
     {
         ABCD,
         CDAB,
-        BADC, 
+        BADC,
         DCBA
     }
 

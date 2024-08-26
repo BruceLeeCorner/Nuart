@@ -52,49 +52,11 @@ namespace NKit.Uart
             _timer.Change(0, Timeout.Infinite);
         }
 
-        protected int OneByteTransmissionTime => (int)Math.Ceiling(10000d / BaudRate);
         protected object Tag { get; set; }
-        protected int TimerPeriod { get; }
+
         protected int TimeCompletedPackageResolvedLatest { get; private set; }
 
-        #region Events
-
-        public event Action<SerialEventArgs<byte[]>> CompletedPackageReceived;
-
-        /// <summary>
-        /// 用于调试串口，强烈建议注册程序只是打印日志
-        /// </summary>
-        public event Action<SerialEventArgs<byte[]>> DataRead;
-
-        public event Action<SerialEventArgs<byte[]>> DataSent;
-
-        public event Action<SerialEventArgs<Exception>> TimedDataReadingJobThrowException;
-
-        #endregion Events
-
-        #region Communication Options
-
-        public int BaudRate => _serialPort.BaudRate;
-
-        public int DataBits => _serialPort.DataBits;
-
-        /// <summary>
-        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
-        /// </summary>
-        public Handshake Handshake => _serialPort.Handshake;
-
-        public Parity Parity => _serialPort.Parity;
-
-        public string PortName => _serialPort.PortName;
-
-        /// <summary>
-        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
-        /// </summary>
-        public bool RtsEnable => _serialPort.RtsEnable;
-
-        public StopBits StopBits => _serialPort.StopBits;
-
-        #endregion Communication Options
+        protected int TimerPeriod { get; }
 
         public void Reset(string portName = null, int? baudRate = null, Parity? parity = null, StopBits? stopBits = null, int? dataBits = null, bool? rtsEnable = null, Handshake? handshake = null)
         {
@@ -140,7 +102,51 @@ namespace NKit.Uart
             }
         }
 
-        protected abstract void FilterCompletedPackages(byte[] copyOfDataReceivedBuffer, Func<bool> hasBytesInReadBuffer, out int[] singlePackageEndingIndexes);
+        protected abstract void FilterCompletedPackages(byte[] dataReceivedBufferCopy, out int[] packageEndingIndexesInBufferCopy, Func<bool> hasRemainingBytesInReadBuffer);
+
+        protected int CalculateTransmissionTime(int byteCount)
+        {
+            return (int)Math.Ceiling(10000d / BaudRate * byteCount);
+        }
+
+        #region Events
+
+        public event Action<SerialEventArgs<byte[]>> CompletedPackageReceived;
+
+        /// <summary>
+        /// 用于调试串口，强烈建议注册程序只是打印日志
+        /// </summary>
+        public event Action<SerialEventArgs<byte[]>> DataRead;
+
+        public event Action<SerialEventArgs<byte[]>> DataSent;
+
+        public event Action<SerialEventArgs<Exception>> TimedDataReadingJobThrowException;
+
+        #endregion Events
+
+        #region Communication Options
+
+        public int BaudRate => _serialPort.BaudRate;
+
+        public int DataBits => _serialPort.DataBits;
+
+        /// <summary>
+        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
+        /// </summary>
+        public Handshake Handshake => _serialPort.Handshake;
+
+        public Parity Parity => _serialPort.Parity;
+
+        public string PortName => _serialPort.PortName;
+
+        /// <summary>
+        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
+        /// </summary>
+        public bool RtsEnable => _serialPort.RtsEnable;
+
+        public StopBits StopBits => _serialPort.StopBits;
+
+        #endregion Communication Options
 
         protected Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 200)
         {
@@ -249,8 +255,8 @@ namespace NKit.Uart
                     }
 
                     // ③ 从应用层接收缓存解析出所有完整帧。如果有完整帧，会执行帧处理事件
-                    FilterCompletedPackages(_dataReceivedBuffer.ToArray(), () => _serialPort.BytesToRead > 0,
-                        out var indexes);
+                    FilterCompletedPackages(_dataReceivedBuffer.ToArray(), out var indexes, () => _serialPort.BytesToRead > 0
+                        );
                     if (indexes != null && indexes.Length > 0)
                     {
                         TimeCompletedPackageResolvedLatest = Environment.TickCount;
@@ -270,10 +276,18 @@ namespace NKit.Uart
                         break;
                     }
 
+                    //缓存为空分2种情况：
+                    //①.刚解析出一个或多个完整帧。这种情况下，绝大概率几毫秒内不会再接收到一个完整帧甚至不会接收到任何数据，跳出循环可以避免循环条件中不必要的CPU自旋耗时。
+                    //②.对方长时间不向己方发送数据。这种情况下，定时任务完全没必要执行自旋等待。
+                    if (_dataReceivedBuffer.Count == 0)
+                    {
+                        break;
+                    }
+
                     // ReSharper disable once AccessToDisposedClosure
                     // 操作系统层接收缓存有未读出的数据或5个字节时间之内有新数据到达，则在本次定时任务继续执行上述4个任务。
                     // (确定还有未处理的数据时，这样做相比于重新等下一次定时器抵达，处理数据更加及时)
-                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead >= 3, OneByteTransmissionTime * 5) || _serialPort.BytesToRead > 0);
+                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2时强制置2，大于5时强制置5
 
                 if (_resetFlag)
                 {
@@ -296,7 +310,6 @@ namespace NKit.Uart
                 _timer.Change(TimeSpan.FromMilliseconds(TimerPeriod), Timeout.InfiniteTimeSpan);
             }
         }
-
 
         public class SerialEventArgs<T> : EventArgs
         {

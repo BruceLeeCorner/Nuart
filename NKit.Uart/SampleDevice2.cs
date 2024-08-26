@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
-using System.Text;
 
 namespace NKit.Uart
 {
-    internal class SampleDevice2:SerialBase
+    internal class SampleDevice2 : SerialBase
     {
         public SampleDevice2(string portName, int baudRate, Parity parity, StopBits stopBits) : base(portName, baudRate, parity, stopBits)
         {
@@ -18,22 +16,22 @@ namespace NKit.Uart
 
         // 单条请求会响应2个帧
         // A[CR] ?[CR]
-        protected override void FilterCompletedPackages(byte[] copyOfDataReceivedBuffer, Func<bool> hasBytesInReadBuffer,
-            out int[] singlePackageEndingIndexes)
+        protected override void FilterCompletedPackages(byte[] dataReceivedBufferCopy,
+            out int[] packageEndingIndexesInBufferCopy, Func<bool> hasRemainingBytesInReadBuffer)
         {
-            singlePackageEndingIndexes = null;
-            if (copyOfDataReceivedBuffer.Contains((byte)'A'))
+            packageEndingIndexesInBufferCopy = null;
+            if (dataReceivedBufferCopy.Contains((byte)'A'))
             {
-                if (copyOfDataReceivedBuffer.Count(item => item == (byte)'\r') == 2)
+                if (dataReceivedBufferCopy.Count(item => item == (byte)'\r') == 2)
                 {
-                    singlePackageEndingIndexes = new[] { 3 };
+                    packageEndingIndexesInBufferCopy = new[] { 3 };
                 }
             }
             else
             {
-                if (copyOfDataReceivedBuffer.Contains((byte)'\r'))
+                if (dataReceivedBufferCopy.Contains((byte)'\r'))
                 {
-                    singlePackageEndingIndexes = new[] { 1 };
+                    packageEndingIndexesInBufferCopy = new[] { 1 };
                 }
             }
         }

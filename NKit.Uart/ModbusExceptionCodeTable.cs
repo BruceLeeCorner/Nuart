@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Linq;
 
 namespace NKit.Uart
 {
@@ -10,6 +7,7 @@ namespace NKit.Uart
         public static ModbusExceptionCodeTable Instance { get; } = new ModbusExceptionCodeTable();
 
         private readonly (byte exceptionCode, string exceptionDescription)[] _innerTable;
+
         private ModbusExceptionCodeTable()
         {
             _innerTable = new (byte exceptionCode, string exceptionDescription)[]

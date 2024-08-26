@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NKit.Uart
+﻿namespace NKit.Uart
 {
     public class FuncCode02
     {
