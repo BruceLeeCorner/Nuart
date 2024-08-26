@@ -273,7 +273,7 @@ namespace NKit.Uart
                     // ReSharper disable once AccessToDisposedClosure
                     // 操作系统层接收缓存有未读出的数据或5个字节时间之内有新数据到达，则在本次定时任务继续执行上述4个任务。
                     // (确定还有未处理的数据时，这样做相比于重新等下一次定时器抵达，处理数据更加及时)
-                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, OneByteTransmissionTime * 5));
+                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead >= 3, OneByteTransmissionTime * 5) || _serialPort.BytesToRead > 0);
 
                 if (_resetFlag)
                 {
