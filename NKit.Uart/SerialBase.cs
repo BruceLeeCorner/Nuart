@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Threading;
+using NLog;
 
 namespace NKit.Uart
 {
@@ -215,7 +217,7 @@ namespace NKit.Uart
                             Thread.Sleep(TimerPeriod * 2);
                         }
                         if (i >= 3)
-                            throw new InvalidOperationException("Port hasn't been opened.");
+                            throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
                     }
 
                     _serialPort.WriteTimeout = writeTimeout;
@@ -288,7 +290,14 @@ namespace NKit.Uart
                     // 操作系统层接收缓存有未读出的数据或5个字节时间之内有新数据到达，则在本次定时任务继续执行上述4个任务。
                     // (确定还有未处理的数据时，这样做相比于重新等下一次定时器抵达，处理数据更加及时)
                 } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2时强制置2，大于5时强制置5
-
+            }
+            catch (Exception e)
+            {
+                TimedDataReadingJobThrowException?.Invoke(new SerialEventArgs<Exception>(e, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+            }
+            finally
+            {
+                // 放到finally，避免try块种出现异常的情况下Reset()一直阻塞。
                 if (_resetFlag)
                 {
                     _dataReceivedBuffer.Clear();
@@ -300,13 +309,6 @@ namespace NKit.Uart
                     _resetFlag = false;
                     _resetPortEvent.Set();
                 }
-            }
-            catch (Exception e)
-            {
-                TimedDataReadingJobThrowException?.Invoke(new SerialEventArgs<Exception>(e, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
-            }
-            finally
-            {
                 _timer.Change(TimeSpan.FromMilliseconds(TimerPeriod), Timeout.InfiniteTimeSpan);
             }
         }

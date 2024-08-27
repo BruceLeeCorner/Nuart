@@ -21,7 +21,6 @@ namespace NKit.Uart
             packageEndingIndexesInBufferCopy = null;
             if (dataReceivedBufferCopy.Length > 0)
             {
-
                 packageEndingIndexesInBufferCopy = SpinWait.SpinUntil(hasRemainingBytesInReadBuffer, CalculateTransmissionTime(1)) ? null : new[] { dataReceivedBufferCopy.Length - 1 };
             }
         }
