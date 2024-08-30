@@ -147,7 +147,7 @@ namespace NKit.Uart
 
         #endregion Communication Options
 
-        protected Response Fire(byte[] bytes, int writeTimeout = 200)
+        protected Response Fire(byte[] bytes, int writeTimeout = 100)
         {
             if (writeTimeout <= 0)
             {

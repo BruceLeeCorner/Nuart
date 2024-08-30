@@ -1,8 +1,8 @@
-﻿using NKit.Uart;
+﻿using System.IO.Ports;
+using NKit.Uart;
 using NLog;
-using System.IO.Ports;
 
-namespace TestNKitUart
+namespace Wintechsh
 {
     /// <summary>
     /// RS-485 2Wire
@@ -51,9 +51,9 @@ namespace TestNKitUart
             };
         }
 
-        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBufferCopy, Func<bool> hasRemainingBytesInReadBuffer)
+        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)
         {
-            return dataReceivedBufferCopy.Length > 0 &&
+            return dataReceivedBuffer.Length > 0 &&
                    SpinWait.SpinUntil(hasRemainingBytesInReadBuffer, this.CalculateTransmissionTime(1)) == false;
         }
     }

@@ -1,9 +1,8 @@
-﻿using NLog;
-using System.IO.Ports;
+﻿using System.IO.Ports;
 using System.Windows;
-using TestNKitUart;
+using NLog;
 
-namespace WpfApp1
+namespace Wintechsh
 {
     /// <summary>
     /// Interaction logic for NuanxinTD2000GChillerWindow.xaml

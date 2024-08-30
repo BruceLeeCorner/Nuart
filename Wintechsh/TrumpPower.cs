@@ -1,8 +1,8 @@
-﻿using NKit.Uart;
+﻿using System.IO.Ports;
+using NKit.Uart;
 using NLog;
-using System.IO.Ports;
 
-namespace WpfApp1
+namespace Wintechsh
 {
     public class TrumpPower : RequestReplyDeviceBase
     {
@@ -24,22 +24,22 @@ namespace WpfApp1
 
             this.DataSent += args =>
             {
-                _logger.Info("Fire: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
+                _logger.Info("Request: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
             this.DataRead += args =>
             {
-                _logger.Info("Read: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
+                _logger.Debug("Read: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
             this.CompletedPackageReceived += args =>
             {
-                _logger.Info("Pack: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
+                _logger.Info("Package: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
             this.TimedDataReadingJobThrowException += args =>
             {
-                _logger.Error(args.Data, "Expt: {0} {1}", args.PortName, args.Tag);
+                _logger.Error(args.Data, "Exception: {0} {1}", args.PortName, args.Tag);
             };
         }
 
@@ -52,9 +52,9 @@ namespace WpfApp1
                 0xff, 0x04,0x02,0x01, 0xff,0xbd,0x85,0x55]);
         }
 
-        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBufferCopy, Func<bool> hasRemainingBytesInReadBuffer)
+        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)
         {
-            return dataReceivedBufferCopy.Length >= 54 && !hasRemainingBytesInReadBuffer.Invoke();
+            return dataReceivedBuffer.Length >= 54 && !hasRemainingBytesInReadBuffer.Invoke();
         }
     }
 }

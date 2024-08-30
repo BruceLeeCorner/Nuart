@@ -1,8 +1,8 @@
-﻿using NKit.Uart;
+﻿using System.IO.Ports;
+using NKit.Uart;
 using NLog;
-using System.IO.Ports;
 
-namespace TestNKitUart
+namespace Wintechsh
 {
     internal class OmronHeater : RequestReplyDeviceBase
     {
@@ -23,9 +23,9 @@ namespace TestNKitUart
             return Request([0x01, 0x03, 0x20, 0x00, 0x00, 0x06, 0xce, 0x08]);
         }
 
-        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBufferCopy, Func<bool> hasRemainingBytesInReadBuffer)
+        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)
         {
-            return dataReceivedBufferCopy.Length == 17 && hasRemainingBytesInReadBuffer.Invoke() == false;
+            return dataReceivedBuffer.Length == 17 && hasRemainingBytesInReadBuffer.Invoke() == false;
         }
 
         private void Subscribe()

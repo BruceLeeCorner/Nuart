@@ -1,8 +1,8 @@
-﻿using NKit.Uart;
+﻿using System.IO.Ports;
+using NKit.Uart;
 using NLog;
-using System.IO.Ports;
 
-namespace TestNKitUart
+namespace Wintechsh
 {
     //  RS232
     internal class EbaraEVS20PDryPump : RequestReplyDeviceBase
@@ -24,9 +24,9 @@ namespace TestNKitUart
             return Request([0x02, 0x4D, 0X32, 0X31, 0X03, 0X42, 0X35, 0X0D]);
         }
 
-        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBufferCopy, Func<bool> hasRemainingBytesInReadBuffer)
+        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)
         {
-            return dataReceivedBufferCopy.Length > 0 && dataReceivedBufferCopy[^1] == (byte)'\r';
+            return dataReceivedBuffer.Length > 0 && dataReceivedBuffer[^1] == (byte)'\r';
         }
 
         private void Subscribe()

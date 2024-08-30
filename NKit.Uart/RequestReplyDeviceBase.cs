@@ -106,7 +106,7 @@ namespace NKit.Uart
             }
         }
 
-        protected abstract bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBufferCopy, Func<bool> hasRemainingBytesInReadBuffer);
+        protected abstract bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer);
 
         protected int CalculateTransmissionTime(int byteCount)
         {
@@ -152,7 +152,7 @@ namespace NKit.Uart
 
         #endregion Communication Options
 
-        protected Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 200)
+        protected Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 100)
         {
             if (waitResponseTimeout <= 0)
             {
