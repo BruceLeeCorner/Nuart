@@ -1,0 +1,15 @@
+﻿<Window x:Class="WpfApp1.OmronHeaterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="OmronHeaterWindow" Height="350" Width="600">
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel>
+            <Button x:Name="Start" Click="Start_OnClick" Width="200" Height="50" Margin="5">start</Button>
+            <Button x:Name="ResetOnce" Click="ResetOnce_OnClick"  Width="200" Height="50" Margin="5">Reset Once</Button>
+            <Button x:Name="ResetAlways" Click="ResetAlways_OnClick"  Width="200" Height="50" Margin="5">Reset Always</Button>
+        </StackPanel>
+    </Grid>
+</Window>

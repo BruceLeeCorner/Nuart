@@ -19,7 +19,7 @@ namespace NKit.Uart
         public Response(Exception ex)
         {
             Exception = ex;
-            ErrorMsg = ex.Message;
+            ErrorMsg = ex.ToString();
         }
 
         public Response(Exception ex, string errorMsg)

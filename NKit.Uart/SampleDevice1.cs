@@ -8,7 +8,7 @@ namespace NKit.Uart
      * 协议帧无拆包特殊字节片段，上一帧与下一帧通过时间间隔确定。如ModbusRTU，超出3.5个字节时间未收到数据，则认为一帧接收完毕。
      */
 
-    internal class SampleDevice1 : SerialBase
+    internal class SampleDevice1 : FireForgetSerialBase
     {
         public SampleDevice1(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits = 8, bool rtsEnable = false, Handshake handshake = Handshake.None) : base(portName, baudRate, parity, stopBits, dataBits, rtsEnable, handshake)
         {

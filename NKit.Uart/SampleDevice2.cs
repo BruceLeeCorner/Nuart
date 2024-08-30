@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace NKit.Uart
 {
-    internal class SampleDevice2 : SerialBase
+    internal class SampleDevice2 : FireForgetSerialBase
     {
         public SampleDevice2(string portName, int baudRate, Parity parity, StopBits stopBits) : base(portName, baudRate, parity, stopBits)
         {
