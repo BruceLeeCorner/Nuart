@@ -23,9 +23,9 @@ namespace Wintechsh
             return Request([0x01, 0x03, 0x20, 0x00, 0x00, 0x06, 0xce, 0x08]);
         }
 
-        protected override bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)
+        protected override bool FilterCompletedFrame(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)
         {
-            return dataReceivedBuffer.Length == 17 && hasRemainingBytesInReadBuffer.Invoke() == false;
+            return dataReceivedBuffer.Length == 17 && !hasRemainingBytesInReadBuffer.Invoke();
         }
 
         private void Subscribe()
@@ -42,9 +42,9 @@ namespace Wintechsh
                 _logger.Debug("Read: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.CompletedPackageReceived += args =>
+            this.CompletedFrameReceived += args =>
             {
-                _logger.Info("Package: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
+                _logger.Info("Reply: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
             this.TimedDataReadingJobThrowException += args =>

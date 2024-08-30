@@ -386,7 +386,7 @@
 
 //        #endregion 0x03
 
-//        protected override bool FilterCompletedPackages(byte[] requestBytes, byte[] bytesHasRead, int bytesLengthToRead, int checkTimes)
+//        protected override bool FilterCompletedFrame(byte[] requestBytes, byte[] bytesHasRead, int bytesLengthToRead, int checkTimes)
 //        {
 //            // 检查是不是异常响应报文
 //            if (bytesHasRead.Length > 0)

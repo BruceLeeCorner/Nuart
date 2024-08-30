@@ -9,7 +9,7 @@ namespace Wintechsh
     /// </summary>
     public partial class OmronHeaterWindow : Window
     {
-        private readonly OmronHeater _device = new("COM85", 9600, Parity.None, StopBits.One);
+        private readonly OmronHeater _device = new("COM20", 9600, Parity.Even, StopBits.Two);
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private int _i;
         private int _j;

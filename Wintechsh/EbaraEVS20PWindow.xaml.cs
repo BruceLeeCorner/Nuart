@@ -54,7 +54,7 @@ namespace Wintechsh
                     while (true)
                     {
                         var r = _device.QueryStatus();
-                        if (r.IsSuccess == false || r.Data.Length != 37)
+                        if (r.IsSuccess == false || r.Data.Length != 27)
                         {
                             _logger.Error($"{r.IsSuccess}   {r.ErrorMsg}   {r.Data.Length}  {r.Exception}");
                         }

@@ -25,7 +25,7 @@ namespace NKit.Uart
         private StopBits _resetStopBits;
         private SerialPort _serialPort;
         private byte[] _lastDataSent;
-        private byte[] _completedPackage;
+        private byte[] _completedFrame;
 
         #endregion Fields
 
@@ -56,7 +56,7 @@ namespace NKit.Uart
 
         protected object Tag { get; set; }
 
-        protected int LastTimeCompletedPackageResolved { get; private set; }
+        protected int LastTimeCompletedFrameResolved { get; private set; }
 
         protected int TimerPeriod { get; }
 
@@ -106,7 +106,7 @@ namespace NKit.Uart
             }
         }
 
-        protected abstract bool FilterCompletedPackages(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer);
+        protected abstract bool FilterCompletedFrame(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer);
 
         protected int CalculateTransmissionTime(int byteCount)
         {
@@ -115,7 +115,7 @@ namespace NKit.Uart
 
         #region Events
 
-        public event Action<SerialEventArgs<byte[]>> CompletedPackageReceived;
+        public event Action<SerialEventArgs<byte[]>> CompletedFrameReceived;
 
         /// <summary>
         /// 用于调试串口，强烈建议注册程序只是打印日志
@@ -190,8 +190,12 @@ namespace NKit.Uart
                     DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
 
                     // 等待响应
+                    if ((end - start) > 40)
+                    {
+                        Console.WriteLine(end -start);
+                    }
                     var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - (end - start));
-                    return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed package.") : new Response<byte[]>(_completedPackage.ToArray());
+                    return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed Frame.") : new Response<byte[]>(_completedFrame.ToArray());
                 }
                 catch (Exception exception)
                 {
@@ -233,13 +237,13 @@ namespace NKit.Uart
                     }
 
                     // ④ 从应用层接收缓存解析出完整帧。如果有完整帧，会执行帧处理事件
-                    bool success = FilterCompletedPackages(_lastDataSent, _dataReceivedBuffer.ToArray(), () => _serialPort.BytesToRead > 0);
+                    bool success = FilterCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), () => _serialPort.BytesToRead > 0);
                     if (success)
                     {
-                        _completedPackage = _dataReceivedBuffer.ToArray();
+                        _completedFrame = _dataReceivedBuffer.ToArray();
                         _waitResponseEvent.Set();
-                        LastTimeCompletedPackageResolved = Environment.TickCount;
-                        CompletedPackageReceived?.Invoke(new SerialEventArgs<byte[]>(_dataReceivedBuffer.ToArray(), Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                        LastTimeCompletedFrameResolved = Environment.TickCount;
+                        CompletedFrameReceived?.Invoke(new SerialEventArgs<byte[]>(_dataReceivedBuffer.ToArray(), Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
                         _dataReceivedBuffer.Clear();
                     }
 

@@ -5,16 +5,17 @@ using NLog;
 namespace Wintechsh
 {
     /// <summary>
-    /// Interaction logic for TrumpPowerWindow.xaml
+    /// Interaction logic for TrumpPlasma1000SPowerWindow.xaml
     /// </summary>
-    public partial class TrumpPowerWindow : Window
+    public partial class TrumpPlasma1000SPowerWindow : Window
     {
-        private readonly TrumpPower _device = new("COM46", 115200, Parity.None, StopBits.One);
+        // 25
+        private readonly TrumpPlasma1000SPower _device = new("COM26", 115200, Parity.None, StopBits.One);
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private int _i;
         private int _k;
 
-        public TrumpPowerWindow()
+        public TrumpPlasma1000SPowerWindow()
         {
             InitializeComponent();
         }
