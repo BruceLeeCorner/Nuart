@@ -52,7 +52,7 @@ namespace Nuart
 
         protected object Tag { get; set; }
 
-        protected int TimeCompletedPackageResolvedLatest { get; private set; }
+        protected int LastTimeCompletedFrameResolved { get; private set; }
 
         protected int TimerPeriod { get; }
         protected int OpenSerialPortTime { get; set; } = 300;
@@ -101,7 +101,7 @@ namespace Nuart
             }
         }
 
-        protected abstract void FilterCompletedPackages(byte[] dataReceivedBufferCopy, out int[] packageEndingIndexesInBufferCopy, Func<bool> hasRemainingBytesInReadBuffer);
+        protected abstract void FilterCompletedFrames(byte[] dataReceivedBuffer, out int[] frameEndingIndexesInBuffer, Func<bool> hasRemainingBytesInReadBuffer);
 
         protected int CalculateTransmissionTime(int byteCount)
         {
@@ -202,21 +202,25 @@ namespace Nuart
                         _serialPort.Open();
                     }
                     // ② 如果OS Buffer有数据，则全部读出来
-                    var temp = new byte[_serialPort.BytesToRead];
-                    int count = _serialPort.Read(temp, 0, temp.Length); // Read不会阻塞，因为肯定有数据。
-                    if (count > 0) // 缓存区有N个字节，但实际可能只读到<N个字节
+                    var bytesToRead = _serialPort.BytesToRead;
+                    if (bytesToRead > 0)
                     {
-                        var data = temp.Take(count).ToArray();
-                        _dataReceivedBuffer.AddRange(data);
-                        DataRead?.Invoke(new SerialEventArgs<byte[]>(data, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                        var temp = new byte[_serialPort.BytesToRead];
+                        int count = _serialPort.Read(temp, 0, temp.Length); // Read不会阻塞，因为肯定有数据。
+                        if (count > 0) // 缓存区有N个字节，但实际可能只读到<N个字节
+                        {
+                            var data = temp.Take(count).ToArray();
+                            _dataReceivedBuffer.AddRange(data);
+                            DataRead?.Invoke(new SerialEventArgs<byte[]>(data, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                        }
                     }
 
                     // ③ 从应用层接收缓存解析出所有完整帧。如果有完整帧，会执行帧处理事件
-                    FilterCompletedPackages(_dataReceivedBuffer.ToArray(), out var indexes, () => _serialPort.BytesToRead > 0
+                    FilterCompletedFrames(_dataReceivedBuffer.ToArray(), out var indexes, () => _serialPort.BytesToRead > 0
                         );
                     if (indexes != null && indexes.Length > 0)
                     {
-                        TimeCompletedPackageResolvedLatest = Environment.TickCount;
+                        LastTimeCompletedFrameResolved = Environment.TickCount;
                         Array.Sort(indexes);
                         for (var i = 0; i < indexes.Length; i++)
                         {
