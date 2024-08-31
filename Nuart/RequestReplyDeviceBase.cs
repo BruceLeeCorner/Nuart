@@ -150,7 +150,7 @@ namespace Nuart
 
         #endregion Communication Options
 
-        protected Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 100)
+        protected Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 200)
         {
             if (waitResponseTimeout <= 0)
             {
