@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace Nuart
 {
-    public abstract class RequestReplyDeviceBase : IDisposable
+    public abstract class RequestReplySerialBase : IDisposable
     {
         #region Fields
 
@@ -30,11 +30,11 @@ namespace Nuart
 
         #endregion Fields
 
-        protected RequestReplyDeviceBase(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
+        protected RequestReplySerialBase(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
         {
         }
 
-        protected RequestReplyDeviceBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake)
+        protected RequestReplySerialBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake)
         {
             _resetPortName = portName;
             _resetBaudRate = baudRate;
@@ -315,7 +315,7 @@ namespace Nuart
 
         #region Disposable
 
-        ~RequestReplyDeviceBase()
+        ~RequestReplySerialBase()
         {
             Dispose(false);
         }

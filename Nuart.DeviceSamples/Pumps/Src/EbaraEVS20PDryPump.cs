@@ -4,7 +4,7 @@ using NLog;
 namespace Nuart.DeviceSamples.Pumps.Src
 {
     //  RS232
-    internal class EbaraEVS20PDryPump : RequestReplyDeviceBase
+    internal class EbaraEVS20PDryPump : RequestReplySerialBase
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
 

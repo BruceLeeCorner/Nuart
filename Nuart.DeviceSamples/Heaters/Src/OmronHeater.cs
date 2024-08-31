@@ -3,7 +3,7 @@ using NLog;
 
 namespace Nuart.DeviceSamples.Heaters.Src
 {
-    internal class OmronHeater : RequestReplyDeviceBase
+    internal class OmronHeater : RequestReplySerialBase
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
 

@@ -7,7 +7,7 @@ namespace Nuart.DeviceSamples.Chillers.Src
     /// <summary>
     /// RS-485 2Wire
     /// </summary>
-    internal class NuanxinTD2000GChiller : RequestReplyDeviceBase
+    internal class NuanxinTD2000GChiller : RequestReplySerialBase
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
 
