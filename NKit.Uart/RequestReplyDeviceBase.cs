@@ -190,10 +190,6 @@ namespace NKit.Uart
                     DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
 
                     // 等待响应
-                    if ((end - start) > 40)
-                    {
-                        Console.WriteLine(end -start);
-                    }
                     var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - (end - start));
                     return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed Frame.") : new Response<byte[]>(_completedFrame.ToArray());
                 }

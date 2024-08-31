@@ -21,7 +21,7 @@ namespace Wintechsh
 
         public Response<byte[]> QueryStatus()
         {
-            return Request([0x02, 0x4D, 0X32, 0X31, 0X03, 0X42, 0X35, 0X0D]);
+            return Request([0x02, 0x4D, 0X32, 0X31, 0X03, 0X42, 0X35, 0X0D],150);
         }
 
         protected override bool FilterCompletedFrame(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer)

@@ -21,7 +21,7 @@ namespace Wintechsh
 
         private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
         {
-            _device = new EbaraEVS20PDryPump("COM80", 9600, Parity.None, StopBits.One);
+            _device = new EbaraEVS20PDryPump("COM13", 9600, Parity.None, StopBits.One);
         }
 
         private void ResetAlways_OnClick(object sender, RoutedEventArgs e)

@@ -10,7 +10,7 @@ namespace Wintechsh
     public partial class TrumpPlasma1000SPowerWindow : Window
     {
         // 25
-        private readonly TrumpPlasma1000SPower _device = new("COM26", 115200, Parity.None, StopBits.One);
+        private readonly TrumpPlasma1000SPower _device = new("COM35", 115200, Parity.None, StopBits.One);
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private int _i;
         private int _k;
