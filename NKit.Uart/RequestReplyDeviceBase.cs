@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Threading;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public abstract class RequestReplyDeviceBase : IDisposable
     {
@@ -183,14 +184,13 @@ namespace NKit.Uart
                     // 发送数据
                     _serialPort.WriteTimeout = waitResponseTimeout;
                     _waitResponseEvent.Reset();
-                    var start = Environment.TickCount;
+                    Stopwatch stopwatch = Stopwatch.StartNew();
                     _serialPort.Write(bytes, 0, bytes.Length);
-                    var end = Environment.TickCount;
                     _lastDataSent = bytes.ToArray();
                     DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
-
                     // 等待响应
-                    var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - (end - start));
+                    stopwatch.Stop();
+                    var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - ((int)stopwatch.ElapsedMilliseconds));
                     return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed Frame.") : new Response<byte[]>(_completedFrame.ToArray());
                 }
                 catch (Exception exception)

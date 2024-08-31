@@ -1,4 +1,4 @@
-﻿namespace NKit.Uart
+﻿namespace Nuart
 {
     internal class FuncCode04
     {

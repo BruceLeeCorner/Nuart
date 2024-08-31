@@ -4,7 +4,7 @@ using System.IO.Ports;
 using System.Linq;
 using System.Threading;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public abstract class FireForgetSerialBase : IDisposable
     {
@@ -45,7 +45,7 @@ namespace NKit.Uart
             _serialPort = new SerialPort(portName, baudRate, parity, dataBits, stopBits);
             _serialPort.RtsEnable = rtsEnable;
             _serialPort.Handshake = handshake;
-            TimerPeriod = 25;
+            TimerPeriod = 20;
             _timer = new Timer(CallBack);
             _timer.Change(0, Timeout.Infinite);
         }

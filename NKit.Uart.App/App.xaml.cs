@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace NKit.Uart.App
+namespace Nuart.Modbus.TestApp
 {
     /// <summary>
     /// Interaction logic for App.xaml

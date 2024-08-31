@@ -1,4 +1,4 @@
-namespace NKit.Uart.Test
+namespace Nuart.Test
 {
     public class UnitTest1
     {

@@ -1,8 +1,7 @@
 ﻿using System.IO.Ports;
-using NKit.Uart;
 using NLog;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples.Heaters.Src
 {
     internal class OmronHeater : RequestReplyDeviceBase
     {
@@ -30,24 +29,24 @@ namespace Wintechsh
 
         private void Subscribe()
         {
-            Tag = this.GetType().Name;
+            Tag = GetType().Name;
 
-            this.DataSent += args =>
+            DataSent += args =>
             {
                 _logger.Info("Request: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.DataRead += args =>
+            DataRead += args =>
             {
                 _logger.Debug("Read: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.CompletedFrameReceived += args =>
+            CompletedFrameReceived += args =>
             {
                 _logger.Info("Reply: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.TimedDataReadingJobThrowException += args =>
+            TimedDataReadingJobThrowException += args =>
             {
                 _logger.Error(args.Data, "Exception: {0} {1}", args.PortName, args.Tag);
             };

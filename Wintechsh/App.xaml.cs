@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples
 {
     /// <summary>
     /// Interaction logic for App.xaml

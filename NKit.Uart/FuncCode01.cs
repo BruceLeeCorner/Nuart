@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public static class FuncCode01
     {

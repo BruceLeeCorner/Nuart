@@ -2,21 +2,26 @@
 using System.Windows;
 using NLog;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples.Pumps.Src
 {
     /// <summary>
-    /// Interaction logic for NuanxinTD2000GChillerWindow.xaml
+    /// Interaction logic for EbaraEVS20PWindow.xaml
     /// </summary>
-    public partial class NuanxinTD2000GChillerWindow : Window
+    public partial class EbaraEVS20PWindow : Window
     {
-        private readonly NuanxinTD2000GChiller _device = new("COM85", 9600, Parity.None, StopBits.One);
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
+        private EbaraEVS20PDryPump _device;
         private int _i;
         private int _j;
 
-        public NuanxinTD2000GChillerWindow()
+        public EbaraEVS20PWindow()
         {
             InitializeComponent();
+        }
+
+        private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
+        {
+            _device = new EbaraEVS20PDryPump("COM13", 9600, Parity.None, StopBits.One);
         }
 
         private void ResetAlways_OnClick(object sender, RoutedEventArgs e)
@@ -49,7 +54,7 @@ namespace Wintechsh
                     while (true)
                     {
                         var r = _device.QueryStatus();
-                        if (r.IsSuccess == false || r.Data.Length != 37)
+                        if (r.IsSuccess == false || r.Data.Length != 27)
                         {
                             _logger.Error($"{r.IsSuccess}   {r.ErrorMsg}   {r.Data.Length}  {r.Exception}");
                         }

@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NKit.Uart\NKit.Uart.csproj" />
+    <ProjectReference Include="..\NKit.Uart\Nuart.csproj" />
   </ItemGroup>
 
   <ItemGroup>

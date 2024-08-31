@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public class MissingMatchException : Exception
     {

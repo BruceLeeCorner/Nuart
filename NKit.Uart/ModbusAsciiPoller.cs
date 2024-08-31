@@ -1,4 +1,4 @@
-﻿namespace NKit.Uart
+﻿namespace Nuart
 {
     //public class ModbusAsciiPoller : Serial,IModbusPoller
     //{

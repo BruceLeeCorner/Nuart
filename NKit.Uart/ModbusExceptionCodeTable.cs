@@ -1,6 +1,6 @@
 ﻿using System.Linq;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public class ModbusExceptionCodeTable
     {

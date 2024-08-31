@@ -1,4 +1,6 @@
-﻿namespace NKit.Uart
+﻿using NKit.Uart;
+
+namespace Nuart
 {
     public interface IModbusPoller
     {

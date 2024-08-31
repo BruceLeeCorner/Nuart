@@ -2,19 +2,19 @@
 using System.Windows;
 using NLog;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples.Chillers.Src
 {
     /// <summary>
-    /// Interaction logic for OmronHeaterWindow.xaml
+    /// Interaction logic for NuanxinTD2000GChillerWindow.xaml
     /// </summary>
-    public partial class OmronHeaterWindow : Window
+    public partial class NuanxinTD2000GChillerWindow : Window
     {
-        private readonly OmronHeater _device = new("COM20", 9600, Parity.Even, StopBits.Two);
+        private readonly NuanxinTD2000GChiller _device = new("COM85", 9600, Parity.None, StopBits.One);
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private int _i;
         private int _j;
 
-        public OmronHeaterWindow()
+        public NuanxinTD2000GChillerWindow()
         {
             InitializeComponent();
         }
@@ -49,7 +49,7 @@ namespace Wintechsh
                     while (true)
                     {
                         var r = _device.QueryStatus();
-                        if (r.IsSuccess == false || r.Data.Length != 17)
+                        if (r.IsSuccess == false || r.Data.Length != 37)
                         {
                             _logger.Error($"{r.IsSuccess}   {r.ErrorMsg}   {r.Data.Length}  {r.Exception}");
                         }

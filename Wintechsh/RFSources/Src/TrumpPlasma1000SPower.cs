@@ -1,8 +1,7 @@
-﻿using NKit.Uart;
+﻿using System.IO.Ports;
 using NLog;
-using System.IO.Ports;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples.RFSources.Src
 {
     // RS232
     public class TrumpPlasma1000SPower : RequestReplyDeviceBase
@@ -21,24 +20,24 @@ namespace Wintechsh
 
         private void Subscribe()
         {
-            Tag = this.GetType().Name;
+            Tag = GetType().Name;
 
-            this.DataSent += args =>
+            DataSent += args =>
             {
                 _logger.Info("Request: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.DataRead += args =>
+            DataRead += args =>
             {
                 _logger.Debug("Read: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.CompletedFrameReceived += args =>
+            CompletedFrameReceived += args =>
             {
                 _logger.Info("Reply: {0} {1} {2}", args.PortName, args.Tag, BitConverter.ToString(args.Data));
             };
 
-            this.TimedDataReadingJobThrowException += args =>
+            TimedDataReadingJobThrowException += args =>
             {
                 _logger.Error(args.Data, "Exception: {0} {1}", args.PortName, args.Tag);
             };

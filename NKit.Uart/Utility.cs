@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using NKit.Uart;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public static class Utility
     {

@@ -1,7 +1,6 @@
-﻿<Application x:Class="NKit.UART.App.App"
+﻿<Application x:Class="Nuart.Modbus.TestApp.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:NKit.UART.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
     </Application.Resources>

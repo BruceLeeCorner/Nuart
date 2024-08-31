@@ -2,7 +2,7 @@
 using System.Windows;
 using NLog;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples.RFSources.Src
 {
     /// <summary>
     /// Interaction logic for TrumpPlasma1000SPowerWindow.xaml
@@ -11,6 +11,7 @@ namespace Wintechsh
     {
         // 25
         private readonly TrumpPlasma1000SPower _device = new("COM35", 115200, Parity.None, StopBits.One);
+
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private int _i;
         private int _k;

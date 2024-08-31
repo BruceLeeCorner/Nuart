@@ -2,26 +2,21 @@
 using System.Windows;
 using NLog;
 
-namespace Wintechsh
+namespace Nuart.DeviceSamples.Heaters.Src
 {
     /// <summary>
-    /// Interaction logic for EbaraEVS20PWindow.xaml
+    /// Interaction logic for OmronHeaterWindow.xaml
     /// </summary>
-    public partial class EbaraEVS20PWindow : Window
+    public partial class OmronHeaterWindow : Window
     {
+        private readonly OmronHeater _device = new("COM20", 9600, Parity.Even, StopBits.Two);
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
-        private EbaraEVS20PDryPump _device;
         private int _i;
         private int _j;
 
-        public EbaraEVS20PWindow()
+        public OmronHeaterWindow()
         {
             InitializeComponent();
-        }
-
-        private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
-        {
-            _device = new EbaraEVS20PDryPump("COM13", 9600, Parity.None, StopBits.One);
         }
 
         private void ResetAlways_OnClick(object sender, RoutedEventArgs e)
@@ -54,7 +49,7 @@ namespace Wintechsh
                     while (true)
                     {
                         var r = _device.QueryStatus();
-                        if (r.IsSuccess == false || r.Data.Length != 27)
+                        if (r.IsSuccess == false || r.Data.Length != 17)
                         {
                             _logger.Error($"{r.IsSuccess}   {r.ErrorMsg}   {r.Data.Length}  {r.Exception}");
                         }

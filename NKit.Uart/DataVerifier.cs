@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace NKit.Uart
+namespace Nuart
 {
     public static class DataVerifier
     {

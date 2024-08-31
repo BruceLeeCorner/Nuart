@@ -2,7 +2,7 @@
 using System.IO.Ports;
 using System.Linq;
 
-namespace NKit.Uart
+namespace Nuart
 {
     internal class SampleDevice2 : FireForgetSerialBase
     {
