@@ -16,6 +16,8 @@ namespace Nuart
         private readonly Timer _timer;
         private readonly object _transmissionLocker;
         private readonly AutoResetEvent _waitResponseEvent;
+        private byte[] _completedFrame;
+        private byte[] _lastDataSent;
         private int _resetBaudRate;
         private int _resetDataBits;
         private bool _resetFlag;
@@ -25,8 +27,6 @@ namespace Nuart
         private bool _resetRtsEnable;
         private StopBits _resetStopBits;
         private SerialPort _serialPort;
-        private byte[] _lastDataSent;
-        private byte[] _completedFrame;
 
         #endregion Fields
 
@@ -55,13 +55,10 @@ namespace Nuart
             _timer.Change(0, Timeout.Infinite);
         }
 
-        protected object Tag { get; set; }
-
         protected int LastTimeCompletedFrameResolved { get; private set; }
-
-        protected int TimerPeriod { get; }
-
         protected int OpenSerialPortTime { get; set; } = 300;
+        protected object Tag { get; set; }
+        protected int TimerPeriod { get; }
 
         public void Reset(string portName = null, int? baudRate = null, Parity? parity = null, StopBits? stopBits = null, int? dataBits = null, bool? rtsEnable = null, Handshake? handshake = null)
         {
@@ -107,12 +104,12 @@ namespace Nuart
             }
         }
 
-        protected abstract bool FilterCompletedFrame(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer);
-
         protected int CalculateTransmissionTime(int byteCount)
         {
             return (int)Math.Ceiling(10000d / BaudRate * byteCount);
         }
+
+        protected abstract bool FilterCompletedFrame(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer);
 
         #region Events
 
@@ -223,17 +220,20 @@ namespace Nuart
                     }
 
                     // ③ 如果OS Buffer有数据，则全部读出来
-                    var temp = new byte[_serialPort.BytesToRead];
-                    int count = _serialPort.Read(temp, 0, temp.Length); // Read不会阻塞，因为肯定有数据。
-                    if (count > 0) // 缓存区有N个字节，但实际可能只读到(N-x)个字节(0<=x<=N)
+                    var bytesToRead = _serialPort.BytesToRead;
+                    if (bytesToRead > 0)
                     {
-                        var data = temp.Take(count).ToArray();
-                        _dataReceivedBuffer.AddRange(data);
-                        DataRead?.Invoke(new SerialEventArgs<byte[]>(data, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                        var temp = new byte[bytesToRead];
+                        int count = _serialPort.Read(temp, 0, temp.Length); // Read不会阻塞，因为肯定有数据。
+                        if (count > 0) // 缓存区有N个字节，但实际可能只读到(N-x)个字节(0<=x<=N)
+                        {
+                            var data = temp.Take(count).ToArray();
+                            _dataReceivedBuffer.AddRange(data);
+                            DataRead?.Invoke(new SerialEventArgs<byte[]>(data, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                        }
                     }
-
                     // ④ 从应用层接收缓存解析出完整帧。如果有完整帧，会执行帧处理事件
-                    bool success = FilterCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), () => _serialPort.BytesToRead > 0);
+                    bool success = FilterCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), HasRemainingBytesInReadBuffer);
                     if (success)
                     {
                         _completedFrame = _dataReceivedBuffer.ToArray();
@@ -284,6 +284,8 @@ namespace Nuart
                 }
             }
         }
+
+        private bool HasRemainingBytesInReadBuffer() => _serialPort.BytesToRead > 0;
 
         public class SerialEventArgs<T> : EventArgs
         {
