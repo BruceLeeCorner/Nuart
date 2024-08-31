@@ -3,13 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35027.167
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart", "NKit.Uart\Nuart.csproj", "{B2BBBAF0-9023-49EA-9894-80970560A7B6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart", "Nuart\Nuart.csproj", "{B2BBBAF0-9023-49EA-9894-80970560A7B6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart.Test", "NKit.Uart.Test\Nuart.Test.csproj", "{75746A7E-030F-40DD-A72E-76D334B60493}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart.Test", "Nuart.Test\Nuart.Test.csproj", "{75746A7E-030F-40DD-A72E-76D334B60493}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart.Modbus.TestApp", "NKit.Uart.App\Nuart.Modbus.TestApp.csproj", "{9CA4DFDC-E3C1-43BF-81D0-6AF229AF44F7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart.Modbus.TestApp", "Nuart.Modbus.TestApp\Nuart.Modbus.TestApp.csproj", "{9CA4DFDC-E3C1-43BF-81D0-6AF229AF44F7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart.DeviceSamples", "Wintechsh\Nuart.DeviceSamples.csproj", "{BF85CB20-2D07-4FAB-A46E-045ABFEB15A4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuart.DeviceSamples", "Nuart.DeviceSamples\Nuart.DeviceSamples.csproj", "{BF85CB20-2D07-4FAB-A46E-045ABFEB15A4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C7526442-E4DC-413D-A2E5-98A8261D21B8}"
 	ProjectSection(SolutionItems) = preProject
