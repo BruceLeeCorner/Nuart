@@ -1,7 +1,48 @@
-﻿<Application
+﻿<prism:PrismApplication
     x:Class="Nuart.DeviceSamples.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    StartupUri="TrumpPlasma1000SPowerWindow.xaml">
-    <Application.Resources />
-</Application>
+    xmlns:prism="http://prismlibrary.com/"
+    xmlns:xcct="http://schemas.xceed.com/wpf/xaml/material/design/themes"
+    xmlns:xctt="http://schemas.xceed.com/wpf/xaml/toolkit/themes"
+    xmlns:xclt="http://schemas.xceed.com/wpf/xaml/listbox/themes"
+    xmlns:xcdt="http://schemas.xceed.com/wpf/xaml/datagrid/themes"
+    xmlns:xcat="http://schemas.xceed.com/wpf/xaml/avalondock/themes"
+
+    >
+    <Application.Resources >
+        <ResourceDictionary>
+
+            <ResourceDictionary.MergedDictionaries>
+
+                <!-- Core Controls -->
+
+                <xcct:MaterialDesignResourceDictionary LicenseKey="WTK46-PHFG9-3Z9GS-6RWA"
+
+                                                       IsDark="True"
+
+                                                       AccentColor="Blue"
+
+                                                       PrimaryColor="Green"/>
+
+                <!-- Toolkit Controls -->
+
+                <xctt:MaterialDesignResourceDictionary />
+
+                <!-- ListBox Controls -->
+
+                <xclt:MaterialDesignResourceDictionary />
+
+                <!-- DataGrid Controls -->
+
+                <xcdt:MaterialDesignResourceDictionary />
+
+                <!-- AvalonDock Controls -->
+
+                <xcat:MaterialDesignResourceDictionary />
+
+            </ResourceDictionary.MergedDictionaries>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</prism:PrismApplication>
