@@ -1,6 +1,6 @@
 ﻿using System.Linq;
 
-namespace Nuart
+namespace Nuart.Modbus
 {
     public class ModbusExceptionCodeTable
     {

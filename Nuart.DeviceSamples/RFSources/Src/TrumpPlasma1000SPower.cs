@@ -1,10 +1,10 @@
-﻿using System.IO.Ports;
-using NLog;
+﻿using NLog;
+using System.IO.Ports;
 
 namespace Nuart.DeviceSamples.RFSources.Src
 {
     // RS232
-    public class TrumpPlasma1000SPower : RequestReplySerialBase
+    public class TrumpPlasma1000SPower : RequestReplySerialInterface
     {
         public TrumpPlasma1000SPower(string portName, int baudRate, Parity parity, StopBits stopBits) : base(portName, baudRate, parity, stopBits)
         {

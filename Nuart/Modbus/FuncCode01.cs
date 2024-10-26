@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace Nuart
+namespace Nuart.Modbus
 {
     public static class FuncCode01
     {

@@ -1,10 +1,10 @@
-﻿using System.IO.Ports;
-using NLog;
+﻿using NLog;
+using System.IO.Ports;
 
 namespace Nuart.DeviceSamples.Pumps.Src
 {
     //  RS232
-    internal class EbaraEVS20PDryPump : RequestReplySerialBase
+    internal class EbaraEVS20PDryPump : RequestReplySerialInterface
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
 

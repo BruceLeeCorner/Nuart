@@ -1,9 +1,9 @@
-﻿using System.IO.Ports;
-using NLog;
+﻿using NLog;
+using System.IO.Ports;
 
 namespace Nuart.DeviceSamples.Heaters.Src
 {
-    internal class OmronHeater : RequestReplySerialBase
+    internal class OmronHeater : RequestReplySerialInterface
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
 

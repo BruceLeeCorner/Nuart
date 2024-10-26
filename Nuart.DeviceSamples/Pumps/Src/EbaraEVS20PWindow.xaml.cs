@@ -1,6 +1,6 @@
-﻿using System.IO.Ports;
+﻿using NLog;
+using System.IO.Ports;
 using System.Windows;
-using NLog;
 
 namespace Nuart.DeviceSamples.Pumps.Src
 {

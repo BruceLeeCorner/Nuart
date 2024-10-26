@@ -4,9 +4,9 @@ using System.IO.Ports;
 using System.Linq;
 using System.Threading;
 
-namespace Nuart
+namespace Nuart.FireForgetModel
 {
-    public abstract class FireForgetSerialBase : IDisposable
+    public sealed class SerialInterface<TReceiveFilter> : IDisposable where TReceiveFilter : IReceiveFilter, new()
     {
         #region Fields
 
@@ -26,11 +26,14 @@ namespace Nuart
 
         #endregion Fields
 
-        protected FireForgetSerialBase(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
+        private int interval;
+        private TReceiveFilter receiveFilter;
+
+        public SerialInterface(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
         {
         }
 
-        protected FireForgetSerialBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake)
+        public SerialInterface(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake)
         {
             _resetPortName = portName;
             _resetBaudRate = baudRate;
@@ -42,20 +45,64 @@ namespace Nuart
             _dataReceivedBuffer = new List<byte>();
             _resetPortEvent = new AutoResetEvent(false);
             _transmissionLocker = new object();
+            receiveFilter = new TReceiveFilter();
             _serialPort = new SerialPort(portName, baudRate, parity, dataBits, stopBits);
             _serialPort.RtsEnable = rtsEnable;
             _serialPort.Handshake = handshake;
-            TimerPeriod = 20;
+            interval = 25;
             _timer = new Timer(CallBack);
             _timer.Change(0, Timeout.Infinite);
         }
 
-        protected object Tag { get; set; }
+        public object Tag { get; set; }
 
-        protected int LastTimeCompletedFrameResolved { get; private set; }
+        public int CalculateTransmissionTime(int byteCount)
+        {
+            return (int)Math.Ceiling(10000d / BaudRate * byteCount);
+        }
 
-        protected int TimerPeriod { get; }
-        protected int OpenSerialPortTime { get; set; } = 300;
+        public Response Fire(byte[] bytes, int writeTimeout = 100)
+        {
+            if (bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+
+            if (writeTimeout <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(writeTimeout), "The argument should be greater than 0");
+            }
+
+            lock (_transmissionLocker)
+            {
+                try
+                {
+                    // 定时器负责打开串口。如果调用过Reset(),Reset()结束后，interval毫秒后串口才会被打开，
+                    // 但是如果Reset()结束立刻Request()夺到_transmissionLocker锁，这个时候串口并没有打开。
+                    // 所以在这里等待至少interval毫秒，另外，还要考虑到串口打开的时间，Moxa串口服务器的虚拟串口Open最大耗时
+                    // 是250ms,所以此处设置的等待时长是留有余地的500ms以上。理论时长是 interval + OpenTimeCost。
+                    if (!_serialPort.IsOpen)
+                    {
+                        int i;
+                        for (i = 1; i < 7 && !_serialPort.IsOpen; i++)
+                        {
+                            Thread.Sleep(interval + i * 15);
+                        }
+                        if (i >= 7)
+                            throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
+                    }
+
+                    _serialPort.WriteTimeout = writeTimeout;
+                    _serialPort.Write(bytes, 0, bytes.Length);
+                    DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                    return new Response();
+                }
+                catch (Exception exception)
+                {
+                    return new Response(exception);
+                }
+            }
+        }
 
         public void Reset(string portName = null, int? baudRate = null, Parity? parity = null, StopBits? stopBits = null, int? dataBits = null, bool? rtsEnable = null, Handshake? handshake = null)
         {
@@ -100,14 +147,6 @@ namespace Nuart
                 _resetPortEvent.WaitOne();
             }
         }
-
-        protected abstract void FilterCompletedFrames(byte[] dataReceivedBuffer, out int[] frameEndingIndexesInBuffer, Func<bool> hasRemainingBytesInReadBuffer);
-
-        protected int CalculateTransmissionTime(int byteCount)
-        {
-            return (int)Math.Ceiling(10000d / BaudRate * byteCount);
-        }
-
         #region Events
 
         public event Action<SerialEventArgs<byte[]>> CompletedPackageReceived;
@@ -147,49 +186,6 @@ namespace Nuart
 
         #endregion Communication Options
 
-        protected Response Fire(byte[] bytes, int writeTimeout = 100)
-        {
-            if (writeTimeout <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(writeTimeout), "The argument should be greater than 0");
-            }
-
-            if (bytes == null)
-            {
-                throw new ArgumentNullException(nameof(bytes));
-            }
-
-            lock (_transmissionLocker)
-            {
-                try
-                {
-                    // 定时器负责打开串口。如果调用过Reset(),Reset()结束后，TimerPeriod毫秒后串口才会被打开，但是如果Reset()结束立刻Request()夺到_transmissionLocker锁，这个时候串口并没有打开。所以在这里等待TimerPeriod * 2 * 10 毫秒。
-                    if (!_serialPort.IsOpen)
-                    {
-                        int i;
-                        for (i = 0; i < 5 && !_serialPort.IsOpen; i++)
-                        {
-                            Thread.Sleep(TimerPeriod + (int)Math.Round(OpenSerialPortTime / 3d));
-                        }
-                        if (i >= 5)
-                            throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
-                    }
-
-                    _serialPort.WriteTimeout = writeTimeout;
-                    _serialPort.Write(bytes, 0, bytes.Length);
-                    DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
-                    return new Response();
-                }
-                catch (Exception exception)
-                {
-                    return new Response(exception);
-                }
-            }
-        }
-
-        // 注意Read不能死等！不要在其他线程轻易调用DiscardIn/OutBuff,会造成Read死等。
-        // Read阻塞型API. 直到缓冲区至少有1个字节可读便返回，如果长时间缓冲区为0，则一直阻塞，直到超时抛出TimeoutException,如果Timeout值是-1，则一直阻塞。
-        // temp.Length - offset 如果是0，表示不读取，任何情况下Read都会立刻返回，不存在阻塞情况。
         private void CallBack(object state)
         {
             try
@@ -216,11 +212,10 @@ namespace Nuart
                     }
 
                     // ③ 从应用层接收缓存解析出所有完整帧。如果有完整帧，会执行帧处理事件
-                    FilterCompletedFrames(_dataReceivedBuffer.ToArray(), out var indexes, () => _serialPort.BytesToRead > 0
+                    receiveFilter.FilterCompletedFrames(_dataReceivedBuffer.ToArray(), out var indexes, _serialPort.BytesToRead > 0
                         );
                     if (indexes != null && indexes.Length > 0)
                     {
-                        LastTimeCompletedFrameResolved = Environment.TickCount;
                         Array.Sort(indexes);
                         for (var i = 0; i < indexes.Length; i++)
                         {
@@ -267,7 +262,7 @@ namespace Nuart
                     _resetFlag = false;
                     _resetPortEvent.Set();
                 }
-                _timer.Change(TimeSpan.FromMilliseconds(TimerPeriod), Timeout.InfiniteTimeSpan);
+                _timer.Change(TimeSpan.FromMilliseconds(interval), Timeout.InfiniteTimeSpan);
             }
         }
 
@@ -299,7 +294,7 @@ namespace Nuart
 
         #region Disposable
 
-        ~FireForgetSerialBase()
+        ~SerialInterface()
         {
             Dispose(false);
         }
@@ -310,7 +305,7 @@ namespace Nuart
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             ReleaseUnmanagedResources();
             if (disposing)

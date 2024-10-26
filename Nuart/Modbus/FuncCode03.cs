@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace Nuart
+namespace Nuart.Modbus
 {
     public class FuncCode03
     {

@@ -9,7 +9,6 @@ namespace Nuart.DeviceSamples
     {
         protected override void RegisterTypes(IContainerRegistry containerRegistry)
         {
-            
         }
 
         protected override Window CreateShell()

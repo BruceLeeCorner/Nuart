@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO.Ports;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.IO.Ports;
 
 namespace Nuart.DeviceSamples
 {
@@ -15,7 +10,7 @@ namespace Nuart.DeviceSamples
         public int[] DataBitsOptions { get; }
         public string[] ParityOptions { get; }
 
-        public RequestReplySerialBase SerialBase { get; set; }
+        public RequestReplySerialInterface SerialBase { get; set; }
 
         public MainViewModel()
         {

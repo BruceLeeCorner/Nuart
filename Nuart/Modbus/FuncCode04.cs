@@ -1,4 +1,4 @@
-﻿namespace Nuart
+﻿namespace Nuart.Modbus
 {
     internal class FuncCode04
     {

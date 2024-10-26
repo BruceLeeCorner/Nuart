@@ -1,6 +1,4 @@
-﻿// ReSharper disable All
-
-namespace NKit.Uart
+﻿namespace Nuart
 {
     public enum ByteOrder2
     {

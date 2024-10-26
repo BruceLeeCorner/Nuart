@@ -19,7 +19,7 @@ namespace Nuart
         public Response(Exception ex)
         {
             Exception = ex;
-            ErrorMsg = ex.ToString();
+            ErrorMsg = string.Empty;
         }
 
         public Response(Exception ex, string errorMsg)

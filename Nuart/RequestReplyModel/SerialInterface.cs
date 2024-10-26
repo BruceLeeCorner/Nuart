@@ -5,9 +5,9 @@ using System.IO.Ports;
 using System.Linq;
 using System.Threading;
 
-namespace Nuart
+namespace Nuart.RequestReplyModel
 {
-    public abstract class RequestReplySerialBase : IDisposable
+    public sealed class SerialInterface<TReceiveFilter> : IDisposable where TReceiveFilter : IReceiveFilter, new()
     {
         #region Fields
 
@@ -27,14 +27,30 @@ namespace Nuart
         private bool _resetRtsEnable;
         private StopBits _resetStopBits;
         private SerialPort _serialPort;
+        private int interval;
+        private TReceiveFilter receiveFilter;
 
         #endregion Fields
 
-        protected RequestReplySerialBase(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
+        #region Constructors
+
+        public SerialInterface(string portName) : this(portName, 9600)
         {
         }
 
-        protected RequestReplySerialBase(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake)
+        public SerialInterface(string portName, int baudRate) : this(portName, baudRate, Parity.None, StopBits.One)
+        {
+        }
+
+        public SerialInterface(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8)
+        {
+        }
+
+        public SerialInterface(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits) : this(portName, baudRate, parity, stopBits, dataBits, false, Handshake.None)
+        {
+        }
+
+        public SerialInterface(string portName, int baudRate, Parity parity, StopBits stopBits, int dataBits, bool rtsEnable, Handshake handshake)
         {
             _resetPortName = portName;
             _resetBaudRate = baudRate;
@@ -47,18 +63,111 @@ namespace Nuart
             _waitResponseEvent = new AutoResetEvent(false);
             _resetPortEvent = new AutoResetEvent(false);
             _transmissionLocker = new object();
+            receiveFilter = new TReceiveFilter();
             _serialPort = new SerialPort(portName, baudRate, parity, dataBits, stopBits);
             _serialPort.RtsEnable = rtsEnable;
             _serialPort.Handshake = handshake;
-            TimerPeriod = 20;
+            interval = 25;
             _timer = new Timer(CallBack);
             _timer.Change(0, Timeout.Infinite);
         }
 
-        protected int LastTimeCompletedFrameResolved { get; private set; }
-        protected int OpenSerialPortTime { get; set; } = 300;
-        protected object Tag { get; set; }
-        protected int TimerPeriod { get; }
+        #endregion Constructors
+
+        #region Events
+
+        /// <summary>
+        /// 用于调试串口，强烈建议注册的事件处理程序只是打印日志
+        /// </summary>
+        public event Action<SerialEventArgs<byte[]>> CompletedFrameReceived;
+
+        public event Action<SerialEventArgs<byte[]>> DataRead;
+
+        public event Action<SerialEventArgs<byte[]>> DataSent;
+
+        public event Action<SerialEventArgs<Exception>> TimedDataReadingJobThrowException;
+
+        #endregion Events
+
+        #region Properties
+
+        public object Tag { get; set; }
+
+        #region Communication Options
+
+        public int BaudRate => _serialPort.BaudRate;
+
+        public int DataBits => _serialPort.DataBits;
+
+        /// <summary>
+        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
+        /// </summary>
+        public Handshake Handshake => _serialPort.Handshake;
+
+        public Parity Parity => _serialPort.Parity;
+
+        public string PortName => _serialPort.PortName;
+
+        /// <summary>
+        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
+        /// </summary>
+        public bool RtsEnable => _serialPort.RtsEnable;
+
+        public StopBits StopBits => _serialPort.StopBits;
+
+        #endregion Communication Options
+
+        #endregion Properties
+
+        public Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 200)
+        {
+            if (bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+
+            if (waitResponseTimeout <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(waitResponseTimeout), "The argument should be greater than 0");
+            }
+
+            lock (_transmissionLocker)
+            {
+                try
+                {
+                    // 定时器负责打开串口。如果调用过Reset(),Reset()结束后，interval毫秒后串口才会被打开，
+                    // 但是如果Reset()结束立刻Request()夺到_transmissionLocker锁，这个时候串口并没有打开。
+                    // 所以在这里等待至少interval毫秒，另外，还要考虑到串口打开的时间，Moxa串口服务器的虚拟串口Open最大耗时
+                    // 是250ms,所以此处设置的等待时长是留有余地的500ms以上。理论时长是 interval + OpenTimeCost。
+                    if (!_serialPort.IsOpen)
+                    {
+                        int i;
+                        for (i = 1; i < 7 && !_serialPort.IsOpen; i++)
+                        {
+                            Thread.Sleep(interval + i * 15);
+                        }
+                        if (i >= 7)
+                            throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
+                    }
+
+                    // 发送数据
+                    _serialPort.WriteTimeout = waitResponseTimeout;
+                    _waitResponseEvent.Reset();
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+                    _serialPort.Write(bytes, 0, bytes.Length);
+                    _lastDataSent = bytes.ToArray();
+                    DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                    // 等待响应
+                    stopwatch.Stop();
+                    var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - (int)stopwatch.ElapsedMilliseconds);
+                    return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed Frame.") : new Response<byte[]>(_completedFrame.ToArray());
+                }
+                catch (Exception exception)
+                {
+                    return new Response<byte[]>(_dataReceivedBuffer.ToArray(), exception);
+                }
+            }
+        }
 
         public void Reset(string portName = null, int? baudRate = null, Parity? parity = null, StopBits? stopBits = null, int? dataBits = null, bool? rtsEnable = null, Handshake? handshake = null)
         {
@@ -104,102 +213,11 @@ namespace Nuart
             }
         }
 
-        protected int CalculateTransmissionTime(int byteCount)
+        public int CalculateTransmissionTime(int byteCount)
         {
             return (int)Math.Ceiling(10000d / BaudRate * byteCount);
         }
 
-        protected abstract bool FilterCompletedFrame(byte[] lastDataSent, byte[] dataReceivedBuffer, Func<bool> hasRemainingBytesInReadBuffer);
-
-        #region Events
-
-        public event Action<SerialEventArgs<byte[]>> CompletedFrameReceived;
-
-        /// <summary>
-        /// 用于调试串口，强烈建议注册程序只是打印日志
-        /// </summary>
-        public event Action<SerialEventArgs<byte[]>> DataRead;
-
-        public event Action<SerialEventArgs<byte[]>> DataSent;
-
-        public event Action<SerialEventArgs<Exception>> TimedDataReadingJobThrowException;
-
-        #endregion Events
-
-        #region Communication Options
-
-        public int BaudRate => _serialPort.BaudRate;
-
-        public int DataBits => _serialPort.DataBits;
-
-        /// <summary>
-        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
-        /// </summary>
-        public Handshake Handshake => _serialPort.Handshake;
-
-        public Parity Parity => _serialPort.Parity;
-
-        public string PortName => _serialPort.PortName;
-
-        /// <summary>
-        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
-        /// </summary>
-        public bool RtsEnable => _serialPort.RtsEnable;
-
-        public StopBits StopBits => _serialPort.StopBits;
-
-        #endregion Communication Options
-
-        protected Response<byte[]> Request(byte[] bytes, int waitResponseTimeout = 200)
-        {
-            if (waitResponseTimeout <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(waitResponseTimeout), "The argument should be greater than 0");
-            }
-
-            if (bytes == null)
-            {
-                throw new ArgumentNullException(nameof(bytes));
-            }
-
-            lock (_transmissionLocker)
-            {
-                try
-                {
-                    // 定时器负责打开串口。如果调用过Reset(),Reset()结束后，TimerPeriod毫秒后串口才会被打开，但是如果Reset()结束立刻Request()夺到_transmissionLocker锁，这个时候串口并没有打开。所以在这里等待TimerPeriod * 2 * 10 毫秒。
-                    if (!_serialPort.IsOpen)
-                    {
-                        int i;
-                        for (i = 0; i < 5 && !_serialPort.IsOpen; i++)
-                        {
-                            Thread.Sleep(TimerPeriod + (int)Math.Round(OpenSerialPortTime / 3d));
-                        }
-                        if (i >= 5)
-                            throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
-                    }
-
-                    // 发送数据
-                    _serialPort.WriteTimeout = waitResponseTimeout;
-                    _waitResponseEvent.Reset();
-                    Stopwatch stopwatch = Stopwatch.StartNew();
-                    _serialPort.Write(bytes, 0, bytes.Length);
-                    _lastDataSent = bytes.ToArray();
-                    DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
-                    // 等待响应
-                    stopwatch.Stop();
-                    var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - ((int)stopwatch.ElapsedMilliseconds));
-                    return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed Frame.") : new Response<byte[]>(_completedFrame.ToArray());
-                }
-                catch (Exception exception)
-                {
-                    return new Response<byte[]>(_dataReceivedBuffer.ToArray(), exception);
-                }
-            }
-        }
-
-        // 注意Read不能死等！不要在其他线程轻易调用DiscardIn/OutBuff,会造成Read死等。
-        // Read阻塞型API. 直到缓冲区至少有1个字节可读便返回，如果长时间缓冲区为0，则一直阻塞，直到超时抛出TimeoutException,如果Timeout值是-1，则一直阻塞。
-        // temp.Length - offset 如果是0，表示不读取，任何情况下Read都会立刻返回，不存在阻塞情况。
         private void CallBack(object state)
         {
             try
@@ -233,13 +251,12 @@ namespace Nuart
                         }
                     }
                     // ④ 从应用层接收缓存解析出完整帧。如果有完整帧，会执行帧处理事件
-                    bool success = FilterCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), HasRemainingBytesInReadBuffer);
+                    bool success = receiveFilter.IsCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), _serialPort.BytesToRead > 0);
                     if (success)
                     {
                         _completedFrame = _dataReceivedBuffer.ToArray();
                         _waitResponseEvent.Set();
-                        LastTimeCompletedFrameResolved = Environment.TickCount;
-                        CompletedFrameReceived?.Invoke(new SerialEventArgs<byte[]>(_dataReceivedBuffer.ToArray(), Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
+                        CompletedFrameReceived?.Invoke(new SerialEventArgs<byte[]>(_completedFrame, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
                         _dataReceivedBuffer.Clear();
                     }
 
@@ -254,7 +271,6 @@ namespace Nuart
                         break;
                     }
 
-                    // ReSharper disable once AccessToDisposedClosure
                     // 操作系统层接收缓存有未读出的数据或5个字节时间之内有新数据到达，则在本次定时任务继续执行上述4个任务。
                     // (确定还有未处理的数据时，这样做相比于重新等下一次定时器抵达，处理数据更加及时)
                 } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2时强制置2，大于5时强制置5
@@ -280,12 +296,10 @@ namespace Nuart
                 }
                 else
                 {
-                    _timer.Change(TimeSpan.FromMilliseconds(TimerPeriod), Timeout.InfiniteTimeSpan);
+                    _timer.Change(TimeSpan.FromMilliseconds(interval), Timeout.InfiniteTimeSpan);
                 }
             }
         }
-
-        private bool HasRemainingBytesInReadBuffer() => _serialPort.BytesToRead > 0;
 
         public class SerialEventArgs<T> : EventArgs
         {
@@ -315,7 +329,7 @@ namespace Nuart
 
         #region Disposable
 
-        ~RequestReplySerialBase()
+        ~SerialInterface()
         {
             Dispose(false);
         }
@@ -326,7 +340,7 @@ namespace Nuart
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             ReleaseUnmanagedResources();
             if (disposing)
