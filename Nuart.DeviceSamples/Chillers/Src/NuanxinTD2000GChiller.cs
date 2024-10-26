@@ -10,11 +10,11 @@ namespace Nuart.DeviceSamples.Chillers.Src
     internal class NuanxinTD2000GChiller
     {
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
-        private SerialInterface<Filter> serialInterface;
+        private SerialInterface<Filter_NuanxinTD2000> serialInterface;
 
         public NuanxinTD2000GChiller(string portName, int baudRate, Parity parity, StopBits stopBits)
         {
-            serialInterface = new SerialInterface<Filter>(portName, baudRate, parity, stopBits);
+            serialInterface = new SerialInterface<Filter_NuanxinTD2000>(portName, baudRate, parity, stopBits);
             serialInterface.Tag = GetType().Name;
             Subscribe();
         }

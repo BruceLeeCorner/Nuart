@@ -93,6 +93,11 @@ namespace Nuart.RequestReplyModel
 
         public object Tag { get; set; }
 
+        /// <summary>
+        /// 可用于做判EOCH HeartBeat IsConnect
+        /// </summary>
+        public int LastCompletedFrameResolvedTime { get; private set; }
+
         #region Communication Options
 
         public int BaudRate => _serialPort.BaudRate;
@@ -135,18 +140,18 @@ namespace Nuart.RequestReplyModel
             {
                 try
                 {
-                    // 定时器负责打开串口。如果调用过Reset(),Reset()结束后，interval毫秒后串口才会被打开，
-                    // 但是如果Reset()结束立刻Request()夺到_transmissionLocker锁，这个时候串口并没有打开。
-                    // 所以在这里等待至少interval毫秒，另外，还要考虑到串口打开的时间，Moxa串口服务器的虚拟串口Open最大耗时
-                    // 是250ms,所以此处设置的等待时长是留有余地的500ms以上。理论时长是 interval + OpenTimeCost。
+                    // 定时器负责打开串口。如果Reset()结束后Request()立刻夺到_transmissionLocker锁，
+                    // 这个时候串口可能并没有打开。经测试Moxa串口服务器的虚拟串口Open最大耗时是250ms,
+                    // 另外，考虑到Moxa是等级产品，其他品牌的虚拟串口的Open可能会更久，所以这里使用的最长等待
+                    // 时长是560ms。
                     if (!_serialPort.IsOpen)
                     {
                         int i;
-                        for (i = 1; i < 7 && !_serialPort.IsOpen; i++)
+                        for (i = 1; i <= 7 && !_serialPort.IsOpen; i++)
                         {
-                            Thread.Sleep(interval + i * 15);
+                            Thread.Sleep(i * 20);
                         }
-                        if (i >= 7)
+                        if (i > 7)
                             throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
                     }
 
@@ -157,8 +162,8 @@ namespace Nuart.RequestReplyModel
                     _serialPort.Write(bytes, 0, bytes.Length);
                     _lastDataSent = bytes.ToArray();
                     DataSent?.Invoke(new SerialEventArgs<byte[]>(bytes, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
-                    // 等待响应
                     stopwatch.Stop();
+                    // 等待响应
                     var timeout = !_waitResponseEvent.WaitOne(waitResponseTimeout - (int)stopwatch.ElapsedMilliseconds);
                     return timeout ? new Response<byte[]>(_dataReceivedBuffer.ToArray(), "Response timeout. Maybe no data was received or received data can't be resolved a completed Frame.") : new Response<byte[]>(_completedFrame.ToArray());
                 }
@@ -213,7 +218,7 @@ namespace Nuart.RequestReplyModel
             }
         }
 
-        public int CalculateTransmissionTime(int byteCount)
+        private int CalculateTransmissionTime(int byteCount)
         {
             return (int)Math.Ceiling(10000d / BaudRate * byteCount);
         }
@@ -251,13 +256,14 @@ namespace Nuart.RequestReplyModel
                         }
                     }
                     // ④ 从应用层接收缓存解析出完整帧。如果有完整帧，会执行帧处理事件
-                    bool success = receiveFilter.IsCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), _serialPort.BytesToRead > 0);
+                    bool success = receiveFilter.IsCompletedFrame(_lastDataSent, _dataReceivedBuffer.ToArray(), ()=> _serialPort.BytesToRead > 0);
                     if (success)
                     {
                         _completedFrame = _dataReceivedBuffer.ToArray();
                         _waitResponseEvent.Set();
                         CompletedFrameReceived?.Invoke(new SerialEventArgs<byte[]>(_completedFrame, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
                         _dataReceivedBuffer.Clear();
+                        LastCompletedFrameResolvedTime = Environment.TickCount;
                     }
 
                     //缓存为空分2种情况：
@@ -273,7 +279,7 @@ namespace Nuart.RequestReplyModel
 
                     // 操作系统层接收缓存有未读出的数据或5个字节时间之内有新数据到达，则在本次定时任务继续执行上述4个任务。
                     // (确定还有未处理的数据时，这样做相比于重新等下一次定时器抵达，处理数据更加及时)
-                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2时强制置2，大于5时强制置5
+                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2ms时强制置2，大于5ms时强制置5
             }
             catch (Exception e)
             {
@@ -299,32 +305,6 @@ namespace Nuart.RequestReplyModel
                     _timer.Change(TimeSpan.FromMilliseconds(interval), Timeout.InfiniteTimeSpan);
                 }
             }
-        }
-
-        public class SerialEventArgs<T> : EventArgs
-        {
-            public SerialEventArgs(T data, object tag, string portName, int baudRate, int dataBits, StopBits stopBits, Parity parity, bool rtsEnable, Handshake handshake)
-            {
-                Data = data;
-                Tag = tag;
-                PortName = portName;
-                BaudRate = baudRate;
-                DataBits = dataBits;
-                StopBits = stopBits;
-                Parity = parity;
-                RtsEnable = rtsEnable;
-                Handshake = handshake;
-            }
-
-            public int BaudRate { get; }
-            public T Data { get; }
-            public int DataBits { get; }
-            public Handshake Handshake { get; }
-            public Parity Parity { get; }
-            public string PortName { get; }
-            public bool RtsEnable { get; }
-            public StopBits StopBits { get; }
-            public object Tag { get; }
         }
 
         #region Disposable

@@ -23,11 +23,18 @@ namespace Nuart.FireForgetModel
         private bool _resetRtsEnable;
         private StopBits _resetStopBits;
         private SerialPort _serialPort;
-
-        #endregion Fields
-
         private int interval;
         private TReceiveFilter receiveFilter;
+        #endregion Fields
+
+        #region Constructors
+        public SerialInterface(string portName) : this(portName, 9600)
+        {
+        }
+
+        public SerialInterface(string portName, int baudRate) : this(portName, baudRate, Parity.None, StopBits.One)
+        {
+        }
 
         public SerialInterface(string portName, int baudRate, Parity parity, StopBits stopBits) : this(portName, baudRate, parity, stopBits, 8, false, Handshake.None)
         {
@@ -54,12 +61,39 @@ namespace Nuart.FireForgetModel
             _timer.Change(0, Timeout.Infinite);
         }
 
-        public object Tag { get; set; }
+        #endregion
 
-        public int CalculateTransmissionTime(int byteCount)
-        {
-            return (int)Math.Ceiling(10000d / BaudRate * byteCount);
-        }
+        #region Properties
+        /// <summary>
+        /// 可用于做判EOCH HeartBeat IsConnect
+        /// </summary>
+        public int LastCompletedFrameResolvedTime { get; private set; }
+
+        public object Tag { get; set; }
+        #region Communication Options
+
+        public int BaudRate => _serialPort.BaudRate;
+
+        public int DataBits => _serialPort.DataBits;
+
+        /// <summary>
+        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
+        /// </summary>
+        public Handshake Handshake => _serialPort.Handshake;
+
+        public Parity Parity => _serialPort.Parity;
+
+        public string PortName => _serialPort.PortName;
+
+        /// <summary>
+        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
+        /// </summary>
+        public bool RtsEnable => _serialPort.RtsEnable;
+
+        public StopBits StopBits => _serialPort.StopBits;
+
+        #endregion Communication Options 
+        #endregion
 
         public Response Fire(byte[] bytes, int writeTimeout = 100)
         {
@@ -77,18 +111,14 @@ namespace Nuart.FireForgetModel
             {
                 try
                 {
-                    // 定时器负责打开串口。如果调用过Reset(),Reset()结束后，interval毫秒后串口才会被打开，
-                    // 但是如果Reset()结束立刻Request()夺到_transmissionLocker锁，这个时候串口并没有打开。
-                    // 所以在这里等待至少interval毫秒，另外，还要考虑到串口打开的时间，Moxa串口服务器的虚拟串口Open最大耗时
-                    // 是250ms,所以此处设置的等待时长是留有余地的500ms以上。理论时长是 interval + OpenTimeCost。
                     if (!_serialPort.IsOpen)
                     {
                         int i;
-                        for (i = 1; i < 7 && !_serialPort.IsOpen; i++)
+                        for (i = 1; i <= 7 && !_serialPort.IsOpen; i++)
                         {
-                            Thread.Sleep(interval + i * 15);
+                            Thread.Sleep(i * 20);
                         }
-                        if (i >= 7)
+                        if (i > 7)
                             throw new InvalidOperationException("Port isn't open and that may have been occupied by another process.");
                     }
 
@@ -147,6 +177,8 @@ namespace Nuart.FireForgetModel
                 _resetPortEvent.WaitOne();
             }
         }
+
+
         #region Events
 
         public event Action<SerialEventArgs<byte[]>> CompletedPackageReceived;
@@ -161,30 +193,6 @@ namespace Nuart.FireForgetModel
         public event Action<SerialEventArgs<Exception>> TimedDataReadingJobThrowException;
 
         #endregion Events
-
-        #region Communication Options
-
-        public int BaudRate => _serialPort.BaudRate;
-
-        public int DataBits => _serialPort.DataBits;
-
-        /// <summary>
-        /// 表示己方在发送数据前是否检查对方此刻允不允许发送数据。
-        /// </summary>
-        public Handshake Handshake => _serialPort.Handshake;
-
-        public Parity Parity => _serialPort.Parity;
-
-        public string PortName => _serialPort.PortName;
-
-        /// <summary>
-        /// True表示设备可以接收数据。这个信号只是决定输出信号给对方，允许对方随时可以向己方发送数据，对方用不用不管。
-        /// </summary>
-        public bool RtsEnable => _serialPort.RtsEnable;
-
-        public StopBits StopBits => _serialPort.StopBits;
-
-        #endregion Communication Options
 
         private void CallBack(object state)
         {
@@ -212,7 +220,7 @@ namespace Nuart.FireForgetModel
                     }
 
                     // ③ 从应用层接收缓存解析出所有完整帧。如果有完整帧，会执行帧处理事件
-                    receiveFilter.FilterCompletedFrames(_dataReceivedBuffer.ToArray(), out var indexes, _serialPort.BytesToRead > 0
+                    receiveFilter.FilterCompletedFrames(_dataReceivedBuffer.ToArray(), out var indexes, ()=>_serialPort.BytesToRead > 0
                         );
                     if (indexes != null && indexes.Length > 0)
                     {
@@ -223,6 +231,7 @@ namespace Nuart.FireForgetModel
                             _dataReceivedBuffer.RemoveRange(0, indexes[i] + 1);
                             CompletedPackageReceived?.Invoke(new SerialEventArgs<byte[]>(package, Tag, PortName, BaudRate, DataBits, StopBits, Parity, RtsEnable, Handshake));
                         }
+                        LastCompletedFrameResolvedTime = Environment.TickCount;
                     }
 
                     // ④ 如果需要会重置串口
@@ -242,7 +251,7 @@ namespace Nuart.FireForgetModel
                     // ReSharper disable once AccessToDisposedClosure
                     // 操作系统层接收缓存有未读出的数据或5个字节时间之内有新数据到达，则在本次定时任务继续执行上述4个任务。
                     // (确定还有未处理的数据时，这样做相比于重新等下一次定时器抵达，处理数据更加及时)
-                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2时强制置2，大于5时强制置5
+                } while (SpinWait.SpinUntil(() => _serialPort.BytesToRead > 0, (CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3)) < 2 ? 2 : CalculateTransmissionTime(3) > 5 ? 5 : CalculateTransmissionTime(3))); // 小于2ms时强制置2，大于5ms时强制置5
             }
             catch (Exception e)
             {
@@ -266,31 +275,11 @@ namespace Nuart.FireForgetModel
             }
         }
 
-        public class SerialEventArgs<T> : EventArgs
+        private int CalculateTransmissionTime(int byteCount)
         {
-            public SerialEventArgs(T data, object tag, string portName, int baudRate, int dataBits, StopBits stopBits, Parity parity, bool rtsEnable, Handshake handshake)
-            {
-                Data = data;
-                Tag = tag;
-                PortName = portName;
-                BaudRate = baudRate;
-                DataBits = dataBits;
-                StopBits = stopBits;
-                Parity = parity;
-                RtsEnable = rtsEnable;
-                Handshake = handshake;
-            }
-
-            public int BaudRate { get; }
-            public T Data { get; }
-            public int DataBits { get; }
-            public Handshake Handshake { get; }
-            public Parity Parity { get; }
-            public string PortName { get; }
-            public bool RtsEnable { get; }
-            public StopBits StopBits { get; }
-            public object Tag { get; }
+            return (int)Math.Ceiling(10000d / BaudRate * byteCount);
         }
+
 
         #region Disposable
 
