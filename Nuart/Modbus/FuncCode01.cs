@@ -65,7 +65,6 @@ namespace Nuart.Modbus
             if (function == 0x81)
             {
                 exceptionCode = response[2];
-                // ReSharper disable once UseArrayEmptyMethod
                 values = new bool[0];
                 return false;
             }
