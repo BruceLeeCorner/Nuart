@@ -1,3 +1,3 @@
-[简体中文](README.zh.md)
+[简体中文](README_zh.md)
 
 # Nuart
