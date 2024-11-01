@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFrameworks>net462;net6.0</TargetFrameworks>
+	  <BaseOutputPath>D:\OUTPUT\ECA149F1-B930-485B-88D22C34B945A</BaseOutputPath>
+	  <IntermediateOutputPath>D:\OUTPUT\ECA149F1-B930-4-812CB-08D2C34B945A</IntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,5 +18,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="rd &quot;$(ProjectDir)obj&quot; /s /q" />
+	</Target>
 </Project>

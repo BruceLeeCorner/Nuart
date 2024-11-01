@@ -7,6 +7,8 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+	  <BaseOutputPath>D:\OUTPUT\ECA14439F1-B930-485B-88D22C34B945A</BaseOutputPath>
+	  <IntermediateOutputPath>D:\OUTPUT\E12CA149F1-B930-4-812CB-08D2C34B945A</IntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,5 +31,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
-
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="rd &quot;$(ProjectDir)obj&quot; /s /q" />
+	</Target>
 </Project>

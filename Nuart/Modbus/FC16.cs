@@ -2,7 +2,7 @@
 
 namespace Nuart.Modbus
 {
-    public class FuncCode16
+    public static class FC16
     {
         public static byte[] BuildRtuRequest(int slaveAddress, int startHoldingRegisterAddress, short[] values)
         {

@@ -1,6 +1,6 @@
 ﻿namespace Nuart.Modbus
 {
-    public class FuncCode02
+    public static class FC02
     {
     }
 }

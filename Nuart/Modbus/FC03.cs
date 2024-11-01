@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Nuart.Modbus
 {
-    public class FuncCode03
+    public static class FC03
     {
         public static byte[] BuildRtuRequest(int slaveAddress, int startHoldingAddress, int quantity)
         {

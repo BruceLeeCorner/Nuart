@@ -5,10 +5,14 @@ using System.Text;
 
 namespace Nuart.Modbus
 {
-    public static class FuncCode01
+    public static class FC01
     {
         public static byte[] BuildRtuRequest(int slaveAddress, int startCoilAddress, int coilQuantity)
         {
+            ArgumentChecker.CheckSlaveAddress01(slaveAddress);
+            ArgumentChecker.CheckRegisterAddress01(startCoilAddress);
+            ArgumentChecker.CheckRegisterQuantity01(coilQuantity);
+
             var bytes = new byte[8];
             bytes[0] = (byte)slaveAddress;
             bytes[1] = 1;
@@ -49,6 +53,15 @@ namespace Nuart.Modbus
 
         public static bool ResolveRtuResponse(byte[] response, out int slaveAddress, out bool[] values, out byte exceptionCode)
         {
+#if NET462
+            if (response == null)
+            {
+                throw new ArgumentNullException(nameof(response));
+            }
+
+#elif NET6_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(response);
+#endif
             // CRC校验
             var length = response.Length;
             var high = response[length - 1];
@@ -56,7 +69,7 @@ namespace Nuart.Modbus
             var (high2, low2) = DataVerifier.Crc16Modbus(response, 0, length - 2);
             if (high != high2 || low != low2)
             {
-                throw new InvalidDataException("CRC failed.");
+                throw new InvalidDataException("CRC16 check failed.");
             }
             // 解析Slave地址
             slaveAddress = response[0];
@@ -65,7 +78,7 @@ namespace Nuart.Modbus
             if (function == 0x81)
             {
                 exceptionCode = response[2];
-                values = new bool[0];
+                values = null;
                 return false;
             }
             if (function != 0x01)
@@ -107,41 +120,5 @@ namespace Nuart.Modbus
         {
             throw new NotImplementedException();
         }
-
-        #region MyRegion
-
-        public interface IMesseneger
-        {
-            void Send(byte[] bytes);
-
-            void Filter();
-        }
-
-        // 分辨出完整的一阵
-        private class ResloveSingleFramer
-        {
-            public ResloveSingleFramer()
-            {
-            }
-
-            public byte[] ResloveSingleFrame()
-            {
-                return null;
-            }
-        }
-
-        private class ReansformStructer
-        {
-            public ReansformStructer()
-            {
-            }
-
-            public object ReansformStruct()
-            {
-                return null;
-            }
-        }
-
-        #endregion MyRegion
     }
 }

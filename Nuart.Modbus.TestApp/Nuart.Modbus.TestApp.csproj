@@ -1,11 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+	  <BaseOutputPath>D:\OUTPUT\ECA14439F1-B930-485B-88D22</BaseOutputPath>
+	  <IntermediateOutputPath>D:\OUTPUT\E12CA149F1-B930-4-812CB4B945A</IntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +15,11 @@
     <PackageReference Include="NLog.Extensions.Logging" Version="5.3.12" />
     <PackageReference Include="NLog.Schema" Version="5.3.3" />
     <PackageReference Include="Prism.DryIoc" Version="9.0.537" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <PackageReference Include="XamlPearls" Version="1.0.0-beta1" />
     <PackageReference Include="Xceed.Products.Wpf.Toolkit.Full" Version="4.6.24151.1544" />
   </ItemGroup>
-
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="rd &quot;$(ProjectDir)obj&quot; /s /q" />
+	</Target>
 </Project>
