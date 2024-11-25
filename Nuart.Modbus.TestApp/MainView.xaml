@@ -30,6 +30,7 @@
                 <xctk:PropertyGrid
                     x:Name="pg"
                     Width="300"
+                    
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Background="Transparent"
